@@ -141,6 +141,14 @@ class Property:
                     "tooltip": "OFF = cleared each workflow run. "
                                "ON = persists until ComfyUI restarts.",
                 }),
+                "error_if_missing": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "OFF = output None and keep running when the value "
+                               "doesn't exist yet (e.g. a getter runs before its "
+                               "setter on the first execution). "
+                               "ON = raise an error instead (strict; useful for "
+                               "catching name typos between setter and getter).",
+                }),
                 "debug": ("BOOLEAN", {
                     "default": False,
                     "tooltip": "Print store operations to console.",
@@ -182,7 +190,7 @@ class Property:
             return float("nan")
         return ""
 
-    def execute(self, name, session_scope, debug, **kwargs):
+    def execute(self, name, session_scope, debug, error_if_missing=False, **kwargs):
         has_value = "value" in kwargs
         has_trigger = "trigger" in kwargs
         value = kwargs.get("value")
@@ -223,15 +231,30 @@ class Property:
                         )
                     return (stored, trigger)
 
-                available = list(store.keys())
-                raise ValueError(
-                    f"Property '{name}' not found in {scope_label} scope.\n"
-                    f"Available keys: {available or '(none)'}\n\n"
-                    f"Make sure a Property node with this name has its value "
-                    f"input connected and executes before this one.\n"
-                    f"Tip: Wire setter's trigger_out → getter's trigger input "
-                    f"to guarantee execution order."
-                )
+                # Key doesn't exist in either scope yet. This is normal on the
+                # first run when a getter executes before its setter (no trigger
+                # chain), so fail soft by returning None and letting the rest of
+                # the graph proceed -- unless the user opted into strict mode.
+                if error_if_missing:
+                    available = list(store.keys())
+                    raise ValueError(
+                        f"Property '{name}' not found in {scope_label} scope.\n"
+                        f"Available keys: {available or '(none)'}\n\n"
+                        f"Make sure a Property node with this name has its value "
+                        f"input connected and executes before this one.\n"
+                        f"Tip: Wire setter's trigger_out → getter's trigger input "
+                        f"to guarantee execution order."
+                    )
+
+                if debug:
+                    available = list(store.keys())
+                    logger.warning(
+                        f"Property GET: '{name}' not found in {scope_label} scope "
+                        f"(available: {available or '(none)'}); returning None. "
+                        f"Wire setter's trigger_out → getter's trigger to ensure "
+                        f"the setter runs first."
+                    )
+                return (None, trigger)
 
 
 # ---------------------------------------------------------------------------

@@ -3,6 +3,7 @@ Node registry - collects all nodes from this package
 """
 
 from .lora_loader_by_index import LoraLoaderByIndex
+from .lora_loader_filtered import LoraLoaderFiltered
 from .image_loader_by_index import ImageLoaderByIndex
 from .video_loader_by_index import VideoLoaderByIndex
 from .video_scrubber import VideoScrubber
@@ -53,11 +54,13 @@ from .curve_cfg_guider import CurveCFGGuider
 from .timer import TimerStart, TimerStop
 from .cfg_zero_star_scaled import CFGZeroStarScaled
 from .cropped_image import CroppedImage
+from .image_inset import ImageInset
 
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
     "CCN_LoraLoaderByIndex": LoraLoaderByIndex,
+    "CCN_LoraLoaderFiltered": LoraLoaderFiltered,
     "CCN_ImageLoaderByIndex": ImageLoaderByIndex,
     "CCN_VideoLoaderByIndex": VideoLoaderByIndex,
     "CCN_VideoScrubber": VideoScrubber,
@@ -134,10 +137,12 @@ NODE_CLASS_MAPPINGS = {
     "CCN_CurveCFGGuider": CurveCFGGuider,
     "CCN_CFGZeroStarScaled": CFGZeroStarScaled,
     "CCN_CroppedImage": CroppedImage,
+    "CCN_ImageInset": ImageInset,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_LoraLoaderByIndex": "LoRA Loader By Index (CCN)",
+    "CCN_LoraLoaderFiltered": "LoRA Loader Filtered (CCN)",
     "CCN_ImageLoaderByIndex": "Image Loader By Index (CCN)",
     "CCN_VideoLoaderByIndex": "Video Loader By Index (CCN)",
     "CCN_VideoScrubber": "Video Scrubber (CCN)",
@@ -214,4 +219,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_CurveCFGGuider": "Curve CFG Guider (CCN)",
     "CCN_CFGZeroStarScaled": "CFG-Zero* Scaled (CCN)",
     "CCN_CroppedImage": "Cropped Image (CCN)",
+    "CCN_ImageInset": "Image Inset (CCN)",
 }

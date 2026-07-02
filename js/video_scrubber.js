@@ -29,13 +29,14 @@ app.registerExtension({
         // ---------------------------------------------------------------
         const container = document.createElement("div");
         container.style.cssText =
-            "display:flex;flex-direction:column;gap:4px;width:100%;padding:2px 0;";
+            "display:flex;flex-direction:column;gap:4px;width:100%;" +
+            "height:100%;box-sizing:border-box;padding:2px 0;";
 
         // upload button
         const uploadBtn = document.createElement("button");
         uploadBtn.textContent = "Upload Video";
         uploadBtn.style.cssText =
-            "width:100%;padding:5px 0;cursor:pointer;" +
+            "width:100%;flex:0 0 auto;padding:5px 0;cursor:pointer;" +
             "border:1px solid #555;background:#333;color:#ddd;" +
             "border-radius:4px;font-size:12px;";
 
@@ -47,37 +48,85 @@ app.registerExtension({
         // preview image
         const previewImg = document.createElement("img");
         previewImg.style.cssText =
-            "width:100%;display:block;background:#111;" +
-            "border-radius:4px;min-height:20px;max-height:320px;" +
-            "object-fit:contain;";
+            "width:100%;flex:1 1 auto;min-height:0;display:block;" +
+            "background:#111;border-radius:4px;object-fit:contain;";
         previewImg.draggable = false;
 
-        // range slider
+        // frame-step row: ◀ [slider] ▶ — arrows jump by the frame_step widget
+        const sliderRow = document.createElement("div");
+        sliderRow.style.cssText =
+            "display:flex;align-items:center;gap:4px;flex:0 0 auto;";
+
+        const arrowCss =
+            "flex:0 0 auto;padding:2px 9px;cursor:pointer;line-height:1;" +
+            "border:1px solid #555;background:#333;color:#ddd;" +
+            "border-radius:4px;font-size:12px;";
+
+        const prevBtn = document.createElement("button");
+        prevBtn.textContent = "\u25C0";
+        prevBtn.title = "Step back by frame_step";
+        prevBtn.style.cssText = arrowCss;
+
         const slider = document.createElement("input");
         slider.type = "range";
         slider.min = "0";
         slider.max = "0";
         slider.value = "0";
-        slider.style.cssText = "width:100%;margin:0;cursor:pointer;";
+        slider.style.cssText =
+            "flex:1 1 auto;min-width:0;margin:0;cursor:pointer;";
+
+        const nextBtn = document.createElement("button");
+        nextBtn.textContent = "\u25B6";
+        nextBtn.title = "Step forward by frame_step";
+        nextBtn.style.cssText = arrowCss;
+
+        sliderRow.appendChild(prevBtn);
+        sliderRow.appendChild(slider);
+        sliderRow.appendChild(nextBtn);
 
         // frame counter label
         const label = document.createElement("div");
         label.style.cssText =
-            "text-align:center;font-size:11px;color:#999;user-select:none;";
+            "flex:0 0 auto;text-align:center;font-size:11px;" +
+            "color:#999;user-select:none;";
         label.textContent = "No video loaded";
+
+        // exact-frame button — decodes the current frame accurately on demand
+        const exactBtn = document.createElement("button");
+        exactBtn.textContent = "Load Exact Frame";
+        exactBtn.style.cssText =
+            "width:100%;flex:0 0 auto;padding:5px 0;cursor:pointer;" +
+            "border:1px solid #555;background:#333;color:#ddd;" +
+            "border-radius:4px;font-size:12px;";
+
+        // clear-cache button — deletes all cached exact-frame PNGs from disk
+        const clearBtn = document.createElement("button");
+        clearBtn.textContent = "Clear Frame Cache";
+        clearBtn.style.cssText =
+            "width:100%;flex:0 0 auto;padding:5px 0;cursor:pointer;" +
+            "border:1px solid #555;background:#333;color:#ddd;" +
+            "border-radius:4px;font-size:12px;";
 
         container.appendChild(uploadBtn);
         container.appendChild(fileInput);
         container.appendChild(previewImg);
-        container.appendChild(slider);
+        container.appendChild(sliderRow);
         container.appendChild(label);
+        container.appendChild(exactBtn);
+        container.appendChild(clearBtn);
+
+        // The preview reports only a MINIMUM height to ComfyUI via getMinHeight.
+        // ComfyUI derives the node's min-size from that, while the element fills
+        // the node's available height above it — so the preview scales up when
+        // the node grows yet the node still resizes back down to the minimum.
+        const MIN_BOX = 160;
 
         // insert as DOM widget right after the video combo
         const domWidget = node.addDOMWidget(
             "ccn_scrubber_ui",
             "div",
             container,
-            { serialize: false }
+            { serialize: false, getMinHeight: () => MIN_BOX }
         );
         const widgets = node.widgets;
         const domIdx = widgets.indexOf(domWidget);
@@ -188,6 +237,27 @@ app.registerExtension({
             debouncedFetch(lastFilename, val);
         };
 
+        // frame_step widget feeds the arrow buttons (UI-only; Python ignores it)
+        const stepWidget = node.widgets.find((w) => w.name === "frame_step");
+
+        // One path to land on a frame: clamp, sync slider + widget + label, fetch.
+        function gotoFrame(val) {
+            const maxIdx = totalFrames > 0 ? totalFrames - 1 : 0;
+            const v = Math.max(0, Math.min(val, maxIdx));
+            slider.value = String(v);
+            scrubWidget.value = v;
+            label.textContent = `Frame ${v} / ${totalFrames}`;
+            debouncedFetch(lastFilename, v);
+        }
+
+        function stepFrames(dir) {
+            const step = Math.max(1, parseInt(stepWidget?.value ?? 1) || 1);
+            gotoFrame(parseInt(slider.value) + dir * step);
+        }
+
+        prevBtn.addEventListener("click", () => stepFrames(-1));
+        nextBtn.addEventListener("click", () => stepFrames(1));
+
         // video combo selection changed
         const origVideoCb = videoWidget.callback;
         videoWidget.callback = function (value) {
@@ -210,11 +280,16 @@ app.registerExtension({
             uploadBtn.disabled = true;
 
             try {
+                // overwrite is appended first so the server route reads it
+                // before the file part it streams to disk
                 const body = new FormData();
-                body.append("image", file);
                 body.append("overwrite", "true");
+                body.append("image", file);
 
-                const resp = await api.fetchApi("/upload/image", {
+                // Custom streaming route, not /upload/image: the stock endpoint
+                // buffers the whole body in RAM and is capped by the server's
+                // max-upload-size, which rejects large videos.
+                const resp = await api.fetchApi("/ccn/video_scrubber/upload", {
                     method: "POST",
                     body,
                 });
@@ -234,13 +309,109 @@ app.registerExtension({
                     videoWidget.value = name;
                     lastFilename = "";
                     onVideoChange(name);
+                    uploadBtn.textContent = "Upload Video";
+                } else {
+                    const detail = await resp.text().catch(() => "");
+                    console.error(
+                        "[CCN VideoScrubber] upload failed:",
+                        resp.status, detail
+                    );
+                    uploadBtn.textContent = "Upload failed";
+                    setTimeout(() => {
+                        uploadBtn.textContent = "Upload Video";
+                    }, 2500);
                 }
             } catch (e) {
                 console.error("[CCN VideoScrubber] upload:", e);
+                uploadBtn.textContent = "Upload failed";
+                setTimeout(() => {
+                    uploadBtn.textContent = "Upload Video";
+                }, 2500);
             } finally {
-                uploadBtn.textContent = "Upload Video";
                 uploadBtn.disabled = false;
                 fileInput.value = "";
+            }
+        });
+
+        // ---------------------------------------------------------------
+        //  Load Exact Frame
+        // ---------------------------------------------------------------
+
+        // Decode the current frame accurately (server-side, threaded) and
+        // show that cached PNG instead of the fast keyframe preview. The crop
+        // node's pull reads whatever <img> we display, so after this press it
+        // pulls the exact frame for free. Any scrub afterward re-fetches a fast
+        // frame and overwrites the preview, reverting to fast automatically.
+        exactBtn.addEventListener("click", async () => {
+            if (!lastFilename || totalFrames <= 0) return;
+            const idx = parseInt(slider.value);
+
+            exactBtn.textContent = "Decoding…";
+            exactBtn.disabled = true;
+            try {
+                const url =
+                    `/ccn/video_scrubber/exact` +
+                    `?filename=${encodeURIComponent(lastFilename)}` +
+                    `&frame=${idx}`;
+                const resp = await api.fetchApi(url);
+                if (!resp.ok) {
+                    console.error(
+                        "[CCN VideoScrubber] exact frame failed:", resp.status
+                    );
+                    return;
+                }
+                const info = await resp.json();
+                // Switching from a blob preview to an on-disk /view URL — drop
+                // the old blob so it isn't leaked.
+                releaseBlobUrl();
+                previewImg.src = api.apiURL(
+                    `/view?filename=${encodeURIComponent(info.filename)}` +
+                    `&type=${info.type}` +
+                    `&subfolder=${encodeURIComponent(info.subfolder || "")}`
+                );
+                label.textContent =
+                    `Frame ${info.frame} / ${totalFrames} · exact`;
+            } catch (e) {
+                console.error("[CCN VideoScrubber] exact frame:", e);
+            } finally {
+                exactBtn.textContent = "Load Exact Frame";
+                exactBtn.disabled = false;
+            }
+        });
+
+        clearBtn.addEventListener("click", async () => {
+            // Frames are re-decoded on demand, so this is non-destructive — but
+            // confirm anyway to guard against a mid-scrub misclick.
+            const ok = window.confirm(
+                "Clear all cached Video Scrubber frames?\n\n" +
+                "They are re-decoded on demand, so nothing is lost permanently."
+            );
+            if (!ok) return;
+
+            clearBtn.textContent = "Clearing\u2026";
+            clearBtn.disabled = true;
+            try {
+                const resp = await api.fetchApi(
+                    "/ccn/video_scrubber/clear_cache", { method: "POST" }
+                );
+                if (!resp.ok) {
+                    console.error(
+                        "[CCN VideoScrubber] clear cache failed:", resp.status
+                    );
+                    label.textContent = "Cache clear failed";
+                    return;
+                }
+                const info = await resp.json();
+                const mb = (info.bytes_freed || 0) / (1024 * 1024);
+                label.textContent = info.cleared
+                    ? `Cleared ${info.cleared} frame(s) \u00b7 ${mb.toFixed(1)} MB freed`
+                    : "Frame cache already empty";
+            } catch (e) {
+                console.error("[CCN VideoScrubber] clear cache:", e);
+                label.textContent = "Cache clear failed";
+            } finally {
+                clearBtn.textContent = "Clear Frame Cache";
+                clearBtn.disabled = false;
             }
         });
 
@@ -268,8 +439,9 @@ app.registerExtension({
             if (origOnRemoved) origOnRemoved.apply(this, arguments);
         };
 
-        // set a reasonable minimum width for the preview to be useful
+        // sensible starting footprint so the preview is usefully large
         node.size[0] = Math.max(node.size[0], 300);
+        node.size[1] = Math.max(node.size[1] || 0, 420);
 
         // initial load if a video is already selected (e.g. duplicated node)
         if (videoWidget.value) {

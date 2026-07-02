@@ -12,11 +12,18 @@ import { api } from "../../scripts/api.js";
  * preserves its pixel-space aspect ratio, its size relative to the
  * image's longest edge, and its normalized center position.
  *
- * Image sources (in priority order):
- *   1. onExecuted callback — preview saved by the Python node
- *   2. "Load Preview" button — fetches upstream node's cached output
- *   3. "Upload Image" button — browser file picker, copies to input dir
- *   4. loaded_image combo — auto-loads when selection changes
+ * The backdrop changes only on explicit user action (Load Preview, Upload
+ * Image, loaded_image selection) or on workflow load — never on execution,
+ * so queueing a job never disturbs the crop you've set up. Execution only
+ * RECORDS the processed source so Load Preview can pull up a wired backdrop
+ * on demand.
+ *
+ * Image sources:
+ *   - "Load Preview" — wired upstream's cached output, else the source the
+ *      node last processed (saved server-side by the Python node), else the
+ *      loaded_image selection
+ *   - "Upload Image" — browser file picker, copies to input dir
+ *   - loaded_image combo — loads when the selection changes
  */
 
 const CORNER_HIT_RADIUS = 12;
@@ -32,14 +39,20 @@ app.registerExtension({
         const origOnExecuted = nodeType.prototype.onExecuted;
         nodeType.prototype.onExecuted = function (message) {
             origOnExecuted?.apply(this, arguments);
-            if (this._ccnCrop && message?.images?.[0]) {
-                const img = message.images[0];
-                this._ccnCrop.loadImage(
-                    api.apiURL(
-                        `/view?filename=${encodeURIComponent(img.filename)}` +
-                        `&type=${img.type}&subfolder=${img.subfolder || ""}`
-                    )
-                );
+            // Record the source the node just processed WITHOUT changing the
+            // displayed backdrop — queueing a job must never swap the preview.
+            // Load Preview pulls this up on demand (see loadBestPreview), so a
+            // wired backdrop stays reachable for any upstream node type. The
+            // preview key is custom (not "images") so it never hits the feed.
+            const preview = message?.ccn_crop_preview?.[0];
+            if (preview) {
+                this._ccnLastPreview = {
+                    url: api.apiURL(
+                        `/view?filename=${encodeURIComponent(preview.filename)}` +
+                        `&type=${preview.type}&subfolder=${preview.subfolder || ""}`
+                    ),
+                    source: message?.ccn_crop_source?.[0] ?? "wired source",
+                };
             }
         };
     },
@@ -87,55 +100,60 @@ app.registerExtension({
         let imgH = 0;
         let dragState = null;
         let lockedRatio = null;
+        let sizeLabel = null;    // px/ratio readout, assigned during DOM construction
+        let sourceLabel = null;  // provenance line, assigned during DOM construction
 
         // ----------------------------------------------------------------
         //  Crop stabilization across image dimension changes.
         //
-        //  When a new image loads with different dimensions we convert the
-        //  crop rectangle from normalized coords back to pixel-space using
-        //  the OLD dimensions, then re-normalize into the NEW dimensions
-        //  while preserving the crop's aspect ratio, its size relative to
-        //  the longest image edge, and its center position.
+        //  lock_ratio OFF: keep the normalized box — the rectangle stays at the
+        //  same relative position and size on the new frame. Same-aspect swaps
+        //  (thumbnail -> full-res) are then exact no-ops.
+        //
+        //  lock_ratio ON: the ratio is the intent, so preserve it. Rebuild the
+        //  crop at the locked ratio, sized to the same fraction of the image's
+        //  longest edge, fitted inside the new frame, recentred.
         // ----------------------------------------------------------------
 
         function adaptCropToNewDimensions(oldW, oldH, newW, newH) {
-            // First load or same dimensions — nothing to adapt
+            // First load or identical dimensions — keep the crop untouched.
             if (!oldW || !oldH || (oldW === newW && oldH === newH)) return;
 
+            const lockW = node.widgets.find((w) => w.name === "lock_ratio");
+            const locked = lockW?.value ?? false;
             const c = getCrop();
 
-            // Pixel-space crop dimensions on the old image
-            const pxW = (c.x2 - c.x1) * oldW;
-            const pxH = (c.y2 - c.y1) * oldH;
-            const cropRatio = pxW / Math.max(pxH, 1e-6);
+            // Unlocked: preserve the normalized rectangle as-is.
+            if (!locked) return;
 
-            // Size as fraction of the old image's longest edge
+            // Locked: hold the ratio captured at lock-drag start if there is
+            // one, else the crop's current pixel ratio on the old image.
+            const oldPxW = (c.x2 - c.x1) * oldW;
+            const oldPxH = (c.y2 - c.y1) * oldH;
+            const ratio = (lockedRatio !== null)
+                ? lockedRatio
+                : (oldPxH > 1e-6 ? oldPxW / oldPxH : 1);
+
+            // Keep the crop's size relative to the longest edge, then rebuild
+            // at the locked ratio with the longer crop side driving.
             const oldLong = Math.max(oldW, oldH);
             const newLong = Math.max(newW, newH);
-            const cropLongest = Math.max(pxW, pxH);
-            const sizeFrac = cropLongest / oldLong;
+            const sizeFrac = Math.max(oldPxW, oldPxH) / oldLong;
+            const targetLong = sizeFrac * newLong;
 
-            // Rebuild crop dimensions in the new image's pixel space
-            let newPxLongest = sizeFrac * newLong;
             let newPxW, newPxH;
-            if (pxW >= pxH) {
-                newPxW = newPxLongest;
-                newPxH = newPxW / cropRatio;
-            } else {
-                newPxH = newPxLongest;
-                newPxW = newPxH * cropRatio;
-            }
+            if (ratio >= 1) { newPxW = targetLong; newPxH = newPxW / ratio; }
+            else            { newPxH = targetLong; newPxW = newPxH * ratio; }
 
-            // Clamp to new image bounds
-            newPxW = Math.min(newPxW, newW);
-            newPxH = Math.min(newPxH, newH);
+            // Fit inside the new frame without distorting the ratio.
+            if (newPxW > newW) { newPxW = newW; newPxH = newPxW / ratio; }
+            if (newPxH > newH) { newPxH = newH; newPxW = newPxH * ratio; }
 
-            // Preserve normalized center, clamp so rectangle stays in bounds
+            // Preserve the normalized centre; clamp so the box stays in bounds.
             const cx = (c.x1 + c.x2) / 2;
             const cy = (c.y1 + c.y2) / 2;
             const halfNW = (newPxW / newW) / 2;
             const halfNH = (newPxH / newH) / 2;
-
             const clampedCx = Math.max(halfNW, Math.min(1 - halfNW, cx));
             const clampedCy = Math.max(halfNH, Math.min(1 - halfNH, cy));
 
@@ -197,6 +215,7 @@ app.registerExtension({
                     "No preview \u2014 Load Preview, Upload Image, or queue once",
                     W / 2, H / 2,
                 );
+                updateSizeLabel();
                 return;
             }
 
@@ -228,22 +247,25 @@ app.registerExtension({
                 ctx.fillRect(pt.x - hs / 2, pt.y - hs / 2, hs, hs);
             }
 
-            // Pixel-dimension label
-            if (imgW && imgH) {
-                const pw = Math.round((crop.x2 - crop.x1) * imgW);
-                const ph = Math.round((crop.y2 - crop.y1) * imgH);
-                const label = `${pw} \u00d7 ${ph}`;
-                ctx.font = "11px monospace";
-                const tm = ctx.measureText(label);
-                const lx = (tl.x + br.x) / 2;
-                const ly = br.y + 16;
-                ctx.fillStyle = "rgba(0,0,0,0.7)";
-                ctx.fillRect(lx - tm.width / 2 - 4, ly - 11, tm.width + 8, 15);
-                ctx.fillStyle = "#fff";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(label, lx, ly - 3);
+            // Crop size is shown in a fixed DOM label below the buttons, not
+            // on the canvas, so it stays visible when the crop nears any edge.
+            updateSizeLabel();
+        }
+
+        // Write the current crop's pixel dimensions into the DOM readout.
+        // Reads live crop coords, so it tracks dragging in real time.
+        function updateSizeLabel() {
+            if (!sizeLabel) return;
+            if (!previewImg || !imgW || !imgH) {
+                sizeLabel.textContent = "\u2014";
+                return;
             }
+            const c = getCrop();
+            const pw = Math.round((c.x2 - c.x1) * imgW);
+            const ph = Math.round((c.y2 - c.y1) * imgH);
+            const ratio = ph > 0 ? (pw / ph) : 0;
+            // px on the first line, bare W/H ratio (2 dp) on the second.
+            sizeLabel.textContent = `${pw} \u00d7 ${ph} px\nratio ${ratio.toFixed(2)}`;
         }
 
         // ----------------------------------------------------------------
@@ -436,7 +458,7 @@ app.registerExtension({
         //  Image loading
         // ----------------------------------------------------------------
 
-        function loadImage(url) {
+        function loadImage(url, source) {
             const img = new window.Image();
             img.crossOrigin = "anonymous";
             img.onload = () => {
@@ -445,9 +467,10 @@ app.registerExtension({
                 imgW = img.naturalWidth;
                 imgH = img.naturalHeight;
 
-                // Adapt crop rectangle to preserve its shape and position
+                // Adapt crop rectangle to the new dimensions (lock-aware).
                 adaptCropToNewDimensions(oldW, oldH, imgW, imgH);
 
+                if (source !== undefined) setSource(source);
                 draw();
             };
             img.onerror = () =>
@@ -455,24 +478,41 @@ app.registerExtension({
             img.src = url;
         }
 
-        // Exposed so the onExecuted hook can reach it
-        node._ccnCrop = { loadImage };
+        // Provenance line under the canvas: which source this preview came from.
+        function setSource(text) {
+            if (sourceLabel) sourceLabel.textContent = text || "";
+        }
 
         // ----------------------------------------------------------------
         //  DOM construction
         // ----------------------------------------------------------------
 
         const container = document.createElement("div");
-        container.style.cssText = "width:100%; display:flex; flex-direction:column;";
+        container.style.cssText =
+            "width:100%;height:100%;box-sizing:border-box;" +
+            "display:flex;flex-direction:column;";
 
+        // Canvas is the flex-fill child; its drawing buffer is synced to its
+        // displayed size in syncSize (one-way: layout -> buffer).
         cvs.style.cssText =
-            "width:100%; background:#1a1a1a; border-radius:4px;";
+            "flex:1 1 auto;min-height:0;width:100%;display:block;" +
+            "background:#1a1a1a;border-radius:4px;";
         cvs.height = CANVAS_HEIGHT;
         container.appendChild(cvs);
 
+        // Provenance line — right under the canvas so it reads as a caption for
+        // what's shown (and, after a run, what was processed).
+        sourceLabel = document.createElement("div");
+        sourceLabel.style.cssText =
+            "flex:0 0 auto;padding:2px 4px 0;font:10px monospace;" +
+            "color:#888;text-align:center;";
+        sourceLabel.textContent = "";
+        container.appendChild(sourceLabel);
+
         // Button row
         const btnRow = document.createElement("div");
-        btnRow.style.cssText = "display:flex; gap:4px; padding:4px 0;";
+        btnRow.style.cssText =
+            "flex:0 0 auto;display:flex;gap:4px;padding:4px 0;";
 
         function makeBtn(label) {
             const b = document.createElement("button");
@@ -494,6 +534,15 @@ app.registerExtension({
         btnRow.appendChild(btnReset);
         container.appendChild(btnRow);
 
+        // Crop dimensions + ratio readout — fixed below the buttons so it's
+        // always visible. pre-line renders the px line and ratio line as two rows.
+        sizeLabel = document.createElement("div");
+        sizeLabel.style.cssText =
+            "flex:0 0 auto;white-space:pre-line;padding:3px 4px 1px;" +
+            "font:11px monospace;color:#ccc;text-align:center;";
+        sizeLabel.textContent = "\u2014";
+        container.appendChild(sizeLabel);
+
         // Hidden file input for the upload button
         const fileInput = document.createElement("input");
         fileInput.type = "file";
@@ -511,12 +560,18 @@ app.registerExtension({
         function findUpstreamPreviewUrl(upstreamNode) {
             if (!upstreamNode) return null;
 
-            // Standard ComfyUI pattern — node.imgs[]
+            // 1) Standard ComfyUI pattern — node.imgs[]
             if (upstreamNode.imgs?.[0]?.src) {
                 return upstreamNode.imgs[0].src;
             }
 
-            // DOM widget fallback — search for <img> elements with a loaded src
+            // 2) CCN convention: a node exposing a live preview of its own
+            //    output (string URL or { src }). Lets transforming nodes be
+            //    previewed without a queue.
+            const ccn = upstreamNode.ccn_image;
+            if (ccn) return typeof ccn === "string" ? ccn : (ccn.src || null);
+
+            // 3) DOM widget fallback — search for <img> elements with a loaded src
             for (const w of upstreamNode.widgets || []) {
                 const el = w.element || w.inputEl;
                 if (!el) continue;
@@ -530,35 +585,70 @@ app.registerExtension({
             return null;
         }
 
-        btnPreview.addEventListener("click", () => {
-            // Try upstream cached output
+        // The active node feeding the image input, or null. A link to a muted
+        // (mode 2) or bypassed (mode 4) upstream counts as NOT wired: a disabled
+        // node yields no image at run time, so the node falls back to
+        // loaded_image — and Load Preview should reflect that, not the dead
+        // source's stale preview.
+        function activeUpstreamNode() {
             const input = node.inputs?.find((i) => i.name === "image");
-            if (input?.link != null) {
-                const link = app.graph.links[input.link];
-                if (link) {
-                    const url = findUpstreamPreviewUrl(
-                        app.graph.getNodeById(link.origin_id)
-                    );
-                    if (url) {
-                        loadImage(url);
-                        return;
-                    }
+            if (input?.link == null) return null;
+            const link = app.graph.links[input.link];
+            if (!link) return null;
+            const up = app.graph.getNodeById(link.origin_id);
+            if (!up) return null;
+            if (up.mode === 2 || up.mode === 4) return null;  // muted / bypassed
+            return up;
+        }
+
+        // Is the image input wired to an ACTIVE upstream? Mirrors Python: a
+        // wired image takes priority over loaded_image only when it will run.
+        function isWired() {
+            return activeUpstreamNode() != null;
+        }
+
+        // Best-effort URL for the active wired upstream's current cached preview.
+        function wiredPreviewUrl() {
+            const up = activeUpstreamNode();
+            return up ? findUpstreamPreviewUrl(up) : null;
+        }
+
+        // Load the backdrop for whatever drives the run. Only ever called from
+        // explicit actions (Load Preview) and workflow load — never on execute —
+        // so the preview stays put between user actions.
+        //   Wired:     upstream's live cached preview, else the exact source the
+        //              node last processed (saved server-side), else nothing.
+        //   Not wired: the current loaded_image selection.
+        function loadBestPreview() {
+            if (isWired()) {
+                const wired = wiredPreviewUrl();
+                if (wired) { loadImage(wired, "wired source"); return true; }
+                if (node._ccnLastPreview) {
+                    loadImage(node._ccnLastPreview.url, node._ccnLastPreview.source);
+                    return true;
                 }
+                return false;
             }
-            // Fallback: loaded_image selection
             const lw = node.widgets.find((w) => w.name === "loaded_image");
             if (lw?.value && lw.value !== "none") {
                 loadImage(
                     api.apiURL(
                         `/view?filename=${encodeURIComponent(lw.value)}&type=input`
-                    )
+                    ),
+                    `loaded: ${lw.value}`,
                 );
-                return;
+                return true;
             }
-            console.log(
-                "[CCN CroppedImage] No preview source. " +
-                "Queue the workflow once, upload an image, or select one from the dropdown."
-            );
+            return false;
+        }
+
+        btnPreview.addEventListener("click", () => {
+            if (!loadBestPreview()) {
+                console.log(
+                    "[CCN CroppedImage] No preview source. Queue once, wire an " +
+                    "image, upload, or select one from the dropdown."
+                );
+            }
         });
 
         btnUpload.addEventListener("click", () => fileInput.click());
@@ -594,11 +684,12 @@ app.registerExtension({
                     lw.value = uploadedName;
                 }
 
-                // Load as preview
+                // Load as preview (explicit pick — show what was just brought in).
                 loadImage(
                     api.apiURL(
                         `/view?filename=${encodeURIComponent(uploadedName)}&type=input`
-                    )
+                    ),
+                    `uploaded: ${uploadedName}`,
                 );
             } catch (err) {
                 console.error("[CCN CroppedImage] Upload error:", err);
@@ -624,7 +715,8 @@ app.registerExtension({
                     loadImage(
                         api.apiURL(
                             `/view?filename=${encodeURIComponent(loadedW.value)}&type=input`
-                        )
+                        ),
+                        `loaded: ${loadedW.value}`,
                     );
                 }
             };
@@ -634,29 +726,47 @@ app.registerExtension({
         //  Register DOM widget
         // ----------------------------------------------------------------
 
+        // The canvas reports only a MINIMUM height to ComfyUI via getMinHeight.
+        // ComfyUI derives the node's min-size from that, while the element fills
+        // the node's available height above it — so the canvas scales up when the
+        // node grows yet the node still resizes back down to the minimum.
+        const MIN_BOX = 200;
         const domWidget = node.addDOMWidget(
             "ccn_crop_canvas", "custom", container,
-            { getValue: () => "", setValue: () => {} },
+            { getValue: () => "", setValue: () => {}, getMinHeight: () => MIN_BOX },
         );
-        domWidget.computeSize = () => [node.size[0], CANVAS_HEIGHT + 36];
 
-        // Keep canvas resolution in sync with layout width
+        // Keep the drawing buffer matched to the canvas's displayed size. One-way
+        // only (layout -> buffer); buffer size never sizes the widget or node, so
+        // it can't drive resize creep.
         function syncSize() {
-            const w = container.clientWidth || node.size?.[0] || 300;
-            if (w > 0 && cvs.width !== w) {
+            const w = Math.round(cvs.clientWidth);
+            const h = Math.round(cvs.clientHeight);
+            if (w > 0 && h > 0 && (cvs.width !== w || cvs.height !== h)) {
                 cvs.width = w;
-                cvs.height = CANVAS_HEIGHT;
+                cvs.height = h;
                 draw();
             }
         }
 
         const observer = new ResizeObserver(syncSize);
-        observer.observe(container);
+        observer.observe(cvs);
 
         const origResize = node.onResize;
         node.onResize = function () {
             origResize?.apply(this, arguments);
             syncSize();
+        };
+
+        // Restore the backdrop on workflow load instead of going blank, using
+        // the same wired > loaded order as the run.
+        const origConfigure = node.onConfigure;
+        node.onConfigure = function () {
+            origConfigure?.apply(this, arguments);
+            requestAnimationFrame(() => {
+                syncSize();
+                loadBestPreview();
+            });
         };
 
         const origRemoved = node.onRemoved;
@@ -665,8 +775,37 @@ app.registerExtension({
             origRemoved?.apply(this, arguments);
         };
 
+        // Expose a live preview of THIS node's output (the cropped region) so
+        // downstream CCN nodes can show it without a queue. Computed on read via
+        // an offscreen canvas, so interaction pays nothing; null until a backdrop
+        // is loaded. try/catch guards a tainted-canvas read so the consumer's
+        // search just falls through.
+        Object.defineProperty(node, "ccn_image", {
+            configurable: true,
+            get() {
+                if (!previewImg || !imgW || !imgH) return null;
+                try {
+                    const c = getCrop();
+                    const sx = Math.round(c.x1 * imgW);
+                    const sy = Math.round(c.y1 * imgH);
+                    const sw = Math.max(1, Math.round((c.x2 - c.x1) * imgW));
+                    const sh = Math.max(1, Math.round((c.y2 - c.y1) * imgH));
+                    const off = document.createElement("canvas");
+                    off.width = sw;
+                    off.height = sh;
+                    const octx = off.getContext("2d");
+                    octx.drawImage(previewImg, sx, sy, sw, sh, 0, 0, sw, sh);
+                    return off.toDataURL("image/png");
+                } catch (err) {
+                    console.warn("[CCN CroppedImage] ccn_image getter failed:", err);
+                    return null;
+                }
+            },
+        });
+
         requestAnimationFrame(() => {
             syncSize();
+            loadBestPreview();   // show a wired/loaded source if one is ready
             draw();
         });
     },

@@ -77,11 +77,14 @@ class CroppedImage:
 
     @classmethod
     def VALIDATE_INPUTS(cls, **kwargs):
-        loaded = kwargs.get("loaded_image", "none")
-        if loaded and loaded != "none":
-            input_dir = folder_paths.get_input_directory()
-            if not os.path.exists(os.path.join(input_dir, loaded)):
-                return f"Image file not found: {loaded}"
+        # Accept any loaded_image value, including a stale or missing one, so a
+        # wired image input is never blocked by it. loaded_image is only used
+        # when nothing is wired (see crop): the resolver prefers the wired image
+        # and raises a clear error at run time if neither a wired image nor a
+        # valid loaded file is available. Validating it here would reject a stale
+        # selection even when a wired image makes it irrelevant. The **kwargs
+        # signature also tells ComfyUI to skip its built-in "value not in list"
+        # combo check, so a filename no longer in the input folder still passes.
         return True
 
     def crop(
@@ -92,6 +95,7 @@ class CroppedImage:
         # Resolve source image: wired takes priority over loaded
         if image is not None:
             src = image
+            source_label = "wired source"
         elif loaded_image and loaded_image != "none":
             input_dir = folder_paths.get_input_directory()
             img_path = os.path.join(input_dir, loaded_image)
@@ -103,6 +107,7 @@ class CroppedImage:
             src = torch.from_numpy(
                 np.array(pil_img).astype(np.float32) / 255.0
             ).unsqueeze(0)
+            source_label = f"loaded: {loaded_image}"
         else:
             raise ValueError(
                 "No image provided. Wire an image input or load one manually."
@@ -166,13 +171,19 @@ class CroppedImage:
             os.path.join(preview_dir, preview_name), compress_level=4,
         )
 
+        # Deliver the preview under a custom UI key (not "images"): ComfyUI
+        # passes it straight to the JS onExecuted handler, but only the literal
+        # "images" key renders a node preview and pushes to the image feed.
+        # This keeps the crop canvas fed while suppressing both of those.
         return {
             "ui": {
-                "images": [{
+                "ccn_crop_preview": [{
                     "filename": preview_name,
                     "subfolder": "",
                     "type": "temp",
                 }],
+                # Reported so the JS can label which source actually ran.
+                "ccn_crop_source": [source_label],
             },
             "result": (friendly, raw_crop, mask, x1, y1, crop_w, crop_h),
         }
