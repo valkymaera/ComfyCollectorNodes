@@ -386,7 +386,7 @@ class NeutralPromptGuider:
                 }),
             },
             "optional": {
-                "curve": ("CURVE",),
+                "curve": ("CCN_CURVE",),
                 "np_entries": ("NP_ENTRIES", {
                     "tooltip": "Neutral prompt entries from NeutralPromptEntry nodes.",
                 }),

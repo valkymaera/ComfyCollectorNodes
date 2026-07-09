@@ -140,7 +140,7 @@ class CurveCFGGuider:
                 "curve_data": ("STRING", {"default": DEFAULT_CURVE, "multiline": False}),
             },
             "optional": {
-                "curve": ("CURVE",),
+                "curve": ("CCN_CURVE",),
             }
         }
 

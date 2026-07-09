@@ -24,7 +24,7 @@ class CurveSample:
                 "curve_data": ("STRING", {"default": CurveSample.DEFAULT_CURVE, "multiline": False}),
             },
             "optional": {
-                "curve": ("CURVE",),
+                "curve": ("CCN_CURVE",),
             }
         }
 

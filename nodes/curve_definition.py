@@ -18,7 +18,10 @@ class CurveDefinition:
             }
         }
 
-    RETURN_TYPES = ("CURVE",)
+    # Namespaced type: the core frontend now owns "CURVE" with an
+    # incompatible {points, interpolation} format and a Vue-only widget
+    RETURN_TYPES = ("CCN_CURVE",)
+    RETURN_NAMES = ("curve",)
     FUNCTION = "define"
     CATEGORY = "CCN"
 
