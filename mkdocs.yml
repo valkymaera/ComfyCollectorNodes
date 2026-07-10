@@ -1,0 +1,61 @@
+site_name: ComfyCollectorNodes
+site_description: >-
+  Custom nodes for ComfyUI — conditioning, latents, LoRA loading,
+  prompt construction, and workflow utilities.
+
+# site_url must match the published Pages URL exactly. GitHub serves the site
+# from the /<repo> subpath, so an incorrect value here produces broken links
+# and is the most common first-deploy failure.
+site_url: https://valkymaera.github.io/ComfyCollectorNodes/
+repo_url: https://github.com/valkymaera/ComfyCollectorNodes
+repo_name: valkymaera/ComfyCollectorNodes
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # The first entry is the scheme new visitors see on first load, so dark
+    # (slate) is placed first to make it the default. The toggle still lets
+    # anyone switch, and each visitor's choice is remembered by their browser.
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.instant   # SPA-like page transitions (needs site_url set)
+    - navigation.tracking  # URL anchor follows the scrolled-to section
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition             # note/warning/tip callout boxes
+  - attr_list
+  - md_in_html             # allows HTML-wrapped, sized images inside markdown
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences   # fenced/nested code blocks and mermaid
+  - pymdownx.tabbed:
+      alternate_style: true
+
+# Search is enabled by default; leaving the plugins list unset keeps it on
+# without having to re-declare it.
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Nodes: nodes/index.md
+  - Concepts: concepts/index.md

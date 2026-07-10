@@ -1,0 +1,28 @@
+name: docs
+
+# Rebuild and publish only when docs-affecting files change, so ordinary node
+# code pushes don't trigger unnecessary site deploys.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:   # manual "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write      # gh-deploy pushes the built site to the gh-pages branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: pip install -r requirements-docs.txt
+      - run: mkdocs gh-deploy --force
