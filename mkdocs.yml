@@ -57,5 +57,13 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Nodes: nodes/index.md
+  - Nodes:
+      - Overview: nodes/index.md
+      - Conditioning: nodes/conditioning.md
+      - Sampling & Guidance: nodes/sampling.md
+      - LoRA: nodes/lora.md
+      - Image & Video: nodes/image.md
+      - Latent: nodes/latent.md
+      - Prompt & Text: nodes/prompt.md
+      - Utilities: nodes/utilities.md
   - Concepts: concepts/index.md
