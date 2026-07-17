@@ -51,6 +51,8 @@ from .curve_cfg_guider import CurveCFGGuider
 from .cfg_zero_star_scaled import CFGZeroStarScaled
 from .cropped_image import CroppedImage
 from .image_inset import ImageInset
+from .hyper_remap_krea2edit import HyperRemapKrea2Edit
+from .hyper_remap_krea2edit_slim import HyperRemapKrea2EditSlim
 
 WEB_DIRECTORY = "./js"
 
@@ -127,6 +129,8 @@ NODE_CLASS_MAPPINGS = {
     "CCN_CFGZeroStarScaled": CFGZeroStarScaled,
     "CCN_CroppedImage": CroppedImage,
     "CCN_ImageInset": ImageInset,
+    "CCN_HyperRemapKrea2Edit": HyperRemapKrea2Edit,
+    "CCN_HyperRemapKrea2EditSlim": HyperRemapKrea2EditSlim,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -202,4 +206,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_CFGZeroStarScaled": "CFG-Zero* Scaled (CCN)",
     "CCN_CroppedImage": "Cropped Image (CCN)",
     "CCN_ImageInset": "Image Inset (CCN)",
+    "CCN_HyperRemapKrea2Edit": "Hyper Remap Krea2 Edit (CCN)",
+    "CCN_HyperRemapKrea2EditSlim": "Hyper Remap Krea2 Edit Slim (CCN)",
 }

@@ -233,8 +233,25 @@ def _build_change_mask(orig_tokens, remap_tokens, cond_shape):
         if key not in remap_tokens:
             return None
 
-        orig_ids = [tid for chunk in orig_tokens[key] for tid, _w in chunk]
-        remap_ids = [tid for chunk in remap_tokens[key] for tid, _w in chunk]
+        def _entry_ids(token_lists):
+            # Only (token_id, weight, ...) sequences support id-level
+            # comparison.  Anything else (image embed dicts, tensors, ...)
+            # defeats the mask — a 2-key dict would even unpack into its
+            # keys without raising, so structure is validated explicitly
+            # rather than trusting unpack errors.
+            ids = []
+            for chunk in token_lists:
+                for entry in chunk:
+                    if not isinstance(entry, (tuple, list)) or len(entry) < 2:
+                        return None
+                    ids.append(entry[0])
+            return ids
+
+        orig_ids = _entry_ids(orig_tokens[key])
+        remap_ids = _entry_ids(remap_tokens[key])
+
+        if orig_ids is None or remap_ids is None:
+            return None
 
         if len(orig_ids) != len(remap_ids):
             return None
@@ -246,7 +263,9 @@ def _build_change_mask(orig_tokens, remap_tokens, cond_shape):
                 mask[0, i] = True
         return mask
 
-    except (StopIteration, IndexError, KeyError):
+    except (StopIteration, IndexError, KeyError, ValueError, TypeError):
+        # ValueError/TypeError: image-bearing token streams (e.g. Qwen3-VL)
+        # may contain entries that aren't (token_id, weight) tuples.
         return None
 
 
@@ -331,12 +350,17 @@ def _apply_token_remap(clip, text, pairs, global_blend, debug=False):
 
 def _apply_concept_remap(
     cond_tensor, clip, pairs, global_blend, global_sharpness, global_threshold,
-    prompt_text=None, debug=False,
+    prompt_text=None, debug=False, encode_concept_fn=None,
 ):
     """
     Nudge a conditioning tensor along concept-direction vectors.
     Per-pair overrides for blend (b), sharpness (s), and threshold (t)
     are pulled from each pair's overrides dict, falling back to globals.
+
+    encode_concept_fn optionally replaces _encode_concept for building
+    concept vectors (same (clip, word) -> vector contract) — used by
+    encoders whose templated tokenization breaks the BOS/EOS content
+    slice that _encode_concept assumes.
     """
     if not pairs:
         return cond_tensor
@@ -347,11 +371,13 @@ def _apply_concept_remap(
         mode = "differential" if use_differential else "cosine"
         print(f"[HyperRemap] Concept remap: {mode} mode, {len(pairs)} pair(s)")
 
+    encode_fn = encode_concept_fn if encode_concept_fn is not None else _encode_concept
+
     # Precompute direction vectors
     directions = []
     for source, target, overrides in pairs:
-        src_vec = _encode_concept(clip, source)
-        tgt_vec = _encode_concept(clip, target)
+        src_vec = encode_fn(clip, source)
+        tgt_vec = encode_fn(clip, target)
         directions.append((source, target, overrides, src_vec, tgt_vec - src_vec))
 
     modified = cond_tensor.clone()
@@ -526,12 +552,30 @@ def _apply_delta_remap(
         )
         sub_seq = sub_output.pop("cond")                           # [1, seq, dim]
 
-        # -- Align to incoming conditioning sequence length --
-        seq_len  = modified.shape[1]
-        base_seq = base_seq[:, :seq_len, :]
-        sub_seq  = sub_seq[:,  :seq_len, :]
+        # -- Align base/sub to each other, then to the incoming length --
+        # Zero-padding the shorter prompt makes its missing tail count as
+        # pure difference, so the longer prompt's extra tokens contribute
+        # fully to the delta instead of raising a shape error.
+        if base_seq.shape[1] != sub_seq.shape[1]:
+            pad_len  = max(base_seq.shape[1], sub_seq.shape[1])
+            base_seq = torch.nn.functional.pad(
+                base_seq, (0, 0, 0, pad_len - base_seq.shape[1])
+            )
+            sub_seq  = torch.nn.functional.pad(
+                sub_seq, (0, 0, 0, pad_len - sub_seq.shape[1])
+            )
+
+        seq_len = modified.shape[1]
+        if base_seq.shape[1] >= seq_len:
+            base_seq = base_seq[:, :seq_len, :]
+            sub_seq  = sub_seq[:,  :seq_len, :]
 
         delta = (base_seq - sub_seq).to(device=modified.device, dtype=modified.dtype)
+
+        # A delta shorter than the incoming conditioning (e.g. text-only aux
+        # encodes against a grounded/VLM conditioning) has no positional
+        # correspondence to it — the combine step switches to pooled mode.
+        pooled_mode = delta.shape[1] != seq_len
 
         # -- Optional normalisation --
         if normalize:
@@ -563,7 +607,13 @@ def _apply_delta_remap(
 
         # -- Incoming-conditioning layer: cosine sim to base pooled --
         if base_pooled is not None:
-            base_pooled_dev = base_pooled.to(device=modified.device, dtype=modified.dtype)
+            # _cosine_similarity_per_position expects a flat (dim,) reference;
+            # pooled outputs arrive as [1, dim] and would otherwise broadcast
+            # the similarity to [1, 1, seq], silently promoting the nudge —
+            # and the returned conditioning — to 4D.
+            base_pooled_dev = base_pooled.to(
+                device=modified.device, dtype=modified.dtype
+            ).reshape(-1)
             raw_sim = _cosine_similarity_per_position(modified, base_pooled_dev)
         else:
             # No pooled output available — uniform weight
@@ -584,8 +634,41 @@ def _apply_delta_remap(
             cond_w = cond_w * (cond_w >= threshold).float()
 
         # -- Combine layers and apply nudge --
-        weights = intrinsic_w * cond_w                             # [1, seq]
-        nudge   = weights.unsqueeze(-1) * delta * blend
+        if pooled_mode:
+            # Position i of the delta and position i of the incoming
+            # conditioning are unrelated tokens, so the per-position product
+            # is meaningless here.  Instead the intrinsic weights select
+            # which delta positions contribute to a single pooled direction,
+            # which is then broadcast across the incoming sequence weighted
+            # by the incoming-conditioning layer alone.
+            iw_sum = intrinsic_w.sum()
+            if iw_sum <= 1e-8:
+                logger.warning(
+                    f"HyperRemap: Delta '{base_text}' ~~ '{sub_text}' has no "
+                    f"contributing positions after intrinsic weighting; "
+                    f"entry skipped"
+                )
+                continue
+            pooled_delta = (
+                (delta * intrinsic_w.unsqueeze(-1)).sum(dim=1, keepdim=True)
+                / iw_sum
+            )                                                      # [1, 1, dim]
+            if normalize:
+                pooled_norm = pooled_delta.norm()
+                if pooled_norm > 1e-8:
+                    pooled_delta = pooled_delta / pooled_norm
+            if debug:
+                print(
+                    f"[HyperRemap] Delta pooled mode: "
+                    f"'{base_text}' ~~ '{sub_text}' "
+                    f"| delta len {delta.shape[1]} vs incoming {seq_len} "
+                    f"| pooled dir norm: {pooled_delta.norm().item():.4f}"
+                )
+            weights = cond_w                                       # [1, seq]
+            nudge   = weights.unsqueeze(-1) * pooled_delta * blend
+        else:
+            weights = intrinsic_w * cond_w                         # [1, seq]
+            nudge   = weights.unsqueeze(-1) * delta * blend
         modified = modified + nudge
 
         if debug:
