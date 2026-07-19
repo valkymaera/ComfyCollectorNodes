@@ -28,7 +28,7 @@ Documentation = "https://valkymaera.github.io/ComfyCollectorNodes/"
 "Bug Tracker" = "https://github.com/valkymaera/ComfyCollectorNodes/issues"
 
 [tool.comfy]
-PublisherId = "@valkymaera"
+PublisherId = "valkymaera"
 DisplayName = "ComfyCollectorNodes"
 Icon = ""
 includes = [] 
