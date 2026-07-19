@@ -9,6 +9,10 @@ from .property import Property, PropertyClear, PropertyList
 from .timer import TimerStart, TimerStop
 from .lora_quantize_fp8 import LoraQuantizeFP8
 from .latent_loader_filtered import LatentLoaderFiltered
+from .moe_sigma_split import MoESigmaSplit
+from .lora_pair_loader import LoraPairLoader
+from .lora_pair_lane import LoraPairLane
+from .moe_sampler_dual import MoESamplerDual
 
 NODE_CLASS_MAPPINGS = {
     "CCN_BetterInt": BetterInt,
@@ -21,6 +25,12 @@ NODE_CLASS_MAPPINGS = {
     "CCN_LoraQuantizeFP8": LoraQuantizeFP8,
     # Key must match js/wip/latent_loader_filtered.js
     "CCN_LatentLoaderFiltered": LatentLoaderFiltered,
+    "CCN_MoESigmaSplit": MoESigmaSplit,
+    # Key must match js/wip/lora_pair_loader.js
+    "CCN_LoraPairLoader": LoraPairLoader,
+    "CCN_LoraPairLane": LoraPairLane,
+    # Key must match js/wip/moe_sampler_dual.js
+    "CCN_MoESamplerDual": MoESamplerDual,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -33,4 +43,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_TimerStop": "Timer Stop (CCN)",
     "CCN_LoraQuantizeFP8": "LoRA Quantize FP8 (CCN)",
     "CCN_LatentLoaderFiltered": "Latent Loader Filtered (CCN)",
+    "CCN_MoESigmaSplit": "MoE Sigma Split (CCN)",
+    "CCN_LoraPairLoader": "LoRA Pair Loader (CCN)",
+    "CCN_LoraPairLane": "LoRA Pair Lane (CCN)",
+    "CCN_MoESamplerDual": "MoE Sampler Dual (CCN)",
 }
