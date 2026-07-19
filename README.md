@@ -26,11 +26,11 @@ Clone into `ComfyUI/custom_nodes/` and restart ComfyUI. See
 These are some nodes I've gotten the most mileage out of, that might be of particular interest.
 
 ## Video Scrubber
-The [video Scrubber](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#video-scrubber) uploads or selects a video to input as normal, but allows you to scrub through to seek a specific single frame. 
+The [video Scrubber](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#video-scrubber) uploads or selects a video to input as normal, but allows you to scrub through to seek a specific single frame instead of a video clip. 
 
 <img width="797" height="744" alt="image" src="https://github.com/user-attachments/assets/88693843-9676-4817-a911-2775a5baffa1" />
 
-This is for image extraction from a video, not video clipping. The other outputs are the single frame, the index of that frame, and the total frames in the video.
+This is for image extraction from a video, not video clipping. The outputs are the single frame, the index of that frame, and the total frames in the video.
 You can scrub in the timeline or step through with the arrows or seek directly by frame input.
 There is a step value input that changes how many frames are skipped when you step manually.
 
