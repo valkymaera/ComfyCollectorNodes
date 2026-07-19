@@ -15,18 +15,31 @@ responsive during a long seek.
 
 import os
 import re
+import io
 import asyncio
 import numpy as np
 import torch
-import cv2
 from PIL import Image
 import folder_paths
 
 from server import PromptServer
 from aiohttp import web
 
+# PyAV is part of ComfyUI's own requirements; the guard only matters on
+# installs old enough to predate that, where the pack should still load.
+try:
+    import av
+    HAS_AV = True
+except ImportError:
+    HAS_AV = False
+
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.gif')
+
+AV_MISSING_ERROR = (
+    "PyAV (av) is required for VideoScrubber. It ships with ComfyUI; "
+    "update ComfyUI or install with: pip install av"
+)
 
 # Subfolder under the input directory where exact-frame PNGs are cached.
 # In the input dir (not temp) for now so the files are easy to inspect,
@@ -50,40 +63,69 @@ def _resolve_video_path(filename):
 
 def _get_video_info(filepath):
     """Extract frame count, dimensions, and FPS from a video file."""
-    cap = cv2.VideoCapture(filepath)
-    if not cap.isOpened():
+    try:
+        with av.open(filepath) as container:
+            if not container.streams.video:
+                return 0, 0, 0, 0.0
+            stream = container.streams.video[0]
+            fps = float(stream.average_rate) if stream.average_rate else 0.0
+            total = stream.frames
+            if not total and fps > 0:
+                # Some containers (webm, gif) don't declare a frame count;
+                # estimate it from the duration instead.
+                if stream.duration and stream.time_base:
+                    total = int(float(stream.duration * stream.time_base) * fps)
+                elif container.duration:
+                    total = int(container.duration / av.time_base * fps)
+            return total, stream.width, stream.height, fps
+    except (av.FFmpegError, OSError, ValueError):
         return 0, 0, 0, 0.0
-    info = (
-        int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
-        int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-        int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        cap.get(cv2.CAP_PROP_FPS),
-    )
-    cap.release()
-    return info
+
+
+def _decode_frame_at(container, stream, frame_idx):
+    """
+    Keyframe-seek toward frame_idx and decode forward to the target frame.
+    Returns the decoded VideoFrame, or None when the position is unreachable.
+    """
+    fps = float(stream.average_rate) if stream.average_rate else 0.0
+    if fps <= 0 or not stream.time_base:
+        return None
+    target_pts = int(frame_idx / fps / stream.time_base)
+    try:
+        container.seek(target_pts, backward=True, stream=stream)
+    except (av.FFmpegError, OSError):
+        container.seek(0)
+    frame = None
+    for f in container.decode(stream):
+        frame = f
+        if f.pts is not None and f.pts >= target_pts:
+            break
+    return frame
 
 
 def _extract_frame_jpeg(filepath, frame_idx, max_dim=512):
     """Extract a single frame as JPEG bytes, downsized for preview thumbnails."""
-    cap = cv2.VideoCapture(filepath)
-    if not cap.isOpened():
+    try:
+        with av.open(filepath) as container:
+            if not container.streams.video:
+                return None
+            frame = _decode_frame_at(
+                container, container.streams.video[0], frame_idx
+            )
+    except (av.FFmpegError, OSError, ValueError):
         return None
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-    ret, frame = cap.read()
-    cap.release()
-    if not ret or frame is None:
+    if frame is None:
         return None
 
-    h, w = frame.shape[:2]
-    if max(h, w) > max_dim:
-        scale = max_dim / max(h, w)
-        frame = cv2.resize(
-            frame, (int(w * scale), int(h * scale)),
-            interpolation=cv2.INTER_AREA,
-        )
+    img = frame.to_image()
+    w, h = img.size
+    if max(w, h) > max_dim:
+        scale = max_dim / max(w, h)
+        img = img.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
 
-    _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-    return buf.tobytes()
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
 
 
 def _extract_frame_rgb(filepath, frame_idx, accurate=False):
@@ -95,31 +137,30 @@ def _extract_frame_rgb(filepath, frame_idx, accurate=False):
     codec-dependent. accurate=True decodes sequentially from the start,
     which is frame-exact but costs one decode per frame up to frame_idx.
     """
-    cap = cv2.VideoCapture(filepath)
-    if not cap.isOpened():
-        return None
     try:
-        if accurate:
-            current = -1
-            frame = None
-            while current < frame_idx:
-                ret, f = cap.read()
-                if not ret:
-                    break
-                current += 1
-                frame = f
-            # Overshot the real end (e.g. an overestimated frame count)
-            if frame is None or current < frame_idx:
+        with av.open(filepath) as container:
+            if not container.streams.video:
                 return None
-        else:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                return None
-    finally:
-        cap.release()
+            stream = container.streams.video[0]
+            if accurate:
+                current = -1
+                frame = None
+                for f in container.decode(stream):
+                    current += 1
+                    frame = f
+                    if current >= frame_idx:
+                        break
+                # Overshot the real end (e.g. an overestimated frame count)
+                if frame is None or current < frame_idx:
+                    return None
+            else:
+                frame = _decode_frame_at(container, stream, frame_idx)
+                if frame is None:
+                    return None
+    except (av.FFmpegError, OSError, ValueError):
+        return None
 
-    return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    return frame.to_ndarray(format="rgb24")
 
 
 # ---------------------------------------------------------------------------
@@ -137,11 +178,10 @@ def _cache_filename(video, frame_idx):
     """
     Build a human-readable, sortable cache filename for one frame.
 
-    The video stem is reduced to ASCII word characters — partly for tidy
-    filenames, but also because OpenCV's image read/write fails on non-ASCII
-    paths on Windows, and these PNGs are written and read back via cv2-adjacent
-    tooling. Two source names that normalize identically would collide, which
-    is unlikely with distinct files in a flat input folder.
+    The video stem is reduced to ASCII word characters, keeping the names
+    tidy, sortable, and safe in /view URLs regardless of the source name.
+    Two source names that normalize identically would collide, which is
+    unlikely with distinct files in a flat input folder.
     """
     stem = os.path.splitext(os.path.basename(video))[0]
     safe = re.sub(r'[^A-Za-z0-9_-]', '_', stem)
@@ -185,6 +225,9 @@ def _extract_and_cache(filepath, frame_idx, cache_path):
 @PromptServer.instance.routes.get("/ccn/video_scrubber/frame")
 async def _api_frame(request):
     """Serve a single video frame as JPEG for the scrubber preview."""
+    if not HAS_AV:
+        return web.Response(status=500, text=AV_MISSING_ERROR)
+
     filename = request.query.get("filename", "")
     frame_idx = int(request.query.get("frame", "0"))
 
@@ -202,6 +245,9 @@ async def _api_frame(request):
 @PromptServer.instance.routes.get("/ccn/video_scrubber/info")
 async def _api_info(request):
     """Serve video metadata (frame count, dimensions, fps)."""
+    if not HAS_AV:
+        return web.json_response({"error": AV_MISSING_ERROR}, status=500)
+
     filename = request.query.get("filename", "")
 
     filepath = _resolve_video_path(filename)
@@ -227,6 +273,9 @@ async def _api_exact(request):
     cache is reused, so re-pressing on the same frame costs nothing. The decode
     is offloaded to a thread so a long sequential seek doesn't stall the server.
     """
+    if not HAS_AV:
+        return web.json_response({"error": AV_MISSING_ERROR}, status=500)
+
     filename = request.query.get("filename", "")
     frame_idx = int(request.query.get("frame", "0"))
 
@@ -424,6 +473,9 @@ class VideoScrubber:
     FUNCTION = "load_video"
 
     def load_video(self, video, scrub_frame, frame_step=1):
+        if not HAS_AV:
+            raise ImportError(AV_MISSING_ERROR)
+
         filepath = _resolve_video_path(video)
         if not filepath:
             raise ValueError(f"Video not found: {video}")

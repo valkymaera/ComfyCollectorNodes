@@ -1,3 +1,14 @@
 wip/
 js/wip/
 local/
+
+# Dev, docs, and backup files that must not ship in the published package
+__pycache__/
+*.rar
+.claude/
+.github/
+.docs-venv/
+site/
+docs/
+mkdocs.yml
+requirements-docs.txt

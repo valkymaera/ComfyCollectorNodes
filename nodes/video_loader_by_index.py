@@ -6,11 +6,13 @@ import os
 import numpy as np
 import torch
 
+# PyAV is part of ComfyUI's own requirements; the guard only matters on
+# installs old enough to predate that, where the pack should still load.
 try:
-    import cv2
-    HAS_CV2 = True
+    import av
+    HAS_AV = True
 except ImportError:
-    HAS_CV2 = False
+    HAS_AV = False
 
 
 VIDEO_EXTENSIONS = ('.mp4', '.avi', '.mov', '.mkv', '.webm', '.gif', '.m4v', '.wmv', '.flv')
@@ -42,47 +44,55 @@ def resolve_index(index, total):
 
 def load_video_frames(file_path, frame_skip, max_frames):
     """
-    Extract frames from a video file using OpenCV.
+    Extract frames from a video file using PyAV.
     Returns a list of numpy arrays in RGB format, plus metadata.
     """
-    cap = cv2.VideoCapture(file_path)
-    if not cap.isOpened():
-        raise ValueError(f"Could not open video: {file_path}")
+    try:
+        container = av.open(file_path)
+    except (av.FFmpegError, OSError, ValueError) as e:
+        raise ValueError(f"Could not open video: {file_path}") from e
 
-    total_video_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    with container:
+        if not container.streams.video:
+            raise ValueError(f"No video stream in: {file_path}")
+        stream = container.streams.video[0]
 
-    frames = []
-    frame_idx = 0
-    collected = 0
+        fps = float(stream.average_rate) if stream.average_rate else 0.0
+        total_video_frames = stream.frames
+        if not total_video_frames and fps > 0:
+            # Some containers (webm, gif) don't declare a frame count;
+            # estimate it from the duration instead.
+            if stream.duration and stream.time_base:
+                total_video_frames = int(float(stream.duration * stream.time_base) * fps)
+            elif container.duration:
+                total_video_frames = int(container.duration / av.time_base * fps)
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+        frames = []
+        frame_idx = 0
+        collected = 0
 
-        if frame_idx % (frame_skip + 1) == 0:
-            # OpenCV reads BGR, convert to RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frames.append(frame_rgb)
-            collected += 1
+        try:
+            for frame in container.decode(stream):
+                if frame_idx % (frame_skip + 1) == 0:
+                    frames.append(frame.to_ndarray(format="rgb24"))
+                    collected += 1
 
-            if max_frames > 0 and collected >= max_frames:
-                break
+                    if max_frames > 0 and collected >= max_frames:
+                        break
 
-        frame_idx += 1
+                frame_idx += 1
+        except av.FFmpegError:
+            # Trailing corruption ends extraction with whatever was decoded,
+            # matching the old behavior of stopping at the first bad read.
+            pass
 
-    cap.release()
-
-    meta = {
-        "total_video_frames": total_video_frames,
-        "fps": fps,
-        "width": width,
-        "height": height,
-        "extracted_frames": len(frames),
-    }
+        meta = {
+            "total_video_frames": total_video_frames,
+            "fps": fps,
+            "width": stream.width,
+            "height": stream.height,
+            "extracted_frames": len(frames),
+        }
     return frames, meta
 
 
@@ -92,7 +102,7 @@ class VideoLoaderByIndex:
     Outputs all frames as a batched IMAGE tensor for use in video workflows.
     Automatically wraps index if it exceeds the number of available files.
 
-    Requires OpenCV (cv2).
+    Requires PyAV (av), bundled with ComfyUI.
     """
 
     CATEGORY = "ComfyCollectorNodes/Loaders"
@@ -123,10 +133,10 @@ class VideoLoaderByIndex:
     FUNCTION = "load_video_by_index"
 
     def load_video_by_index(self, directory, recursive, index, frame_skip, max_frames, debug=False):
-        if not HAS_CV2:
+        if not HAS_AV:
             raise ImportError(
-                "OpenCV (cv2) is required for VideoLoaderByIndex. "
-                "Install with: pip install opencv-python-headless"
+                "PyAV (av) is required for VideoLoaderByIndex. It ships with "
+                "ComfyUI; update ComfyUI or install with: pip install av"
             )
 
         directory = directory.strip()

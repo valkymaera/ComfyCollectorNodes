@@ -48,13 +48,13 @@ from .float_lerp import FloatLerp
 from .curve_sample import CurveSample
 from .curve_definition import CurveDefinition
 from .curve_cfg_guider import CurveCFGGuider
+from .curve_from_core import CurveFromCore
+from .curve_to_core import CurveToCore
 from .cfg_zero_star_scaled import CFGZeroStarScaled
 from .cropped_image import CroppedImage
 from .image_inset import ImageInset
 from .hyper_remap_krea2edit import HyperRemapKrea2Edit
 from .hyper_remap_krea2edit_slim import HyperRemapKrea2EditSlim
-
-WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
     "CCN_LoraLoaderByIndex": LoraLoaderByIndex,
@@ -128,6 +128,8 @@ NODE_CLASS_MAPPINGS = {
     "CCN_CurveSample": CurveSample,
     "CCN_CurveDefinition": CurveDefinition,
     "CCN_CurveCFGGuider": CurveCFGGuider,
+    "CCN_CurveFromCore": CurveFromCore,
+    "CCN_CurveToCore": CurveToCore,
     "CCN_CFGZeroStarScaled": CFGZeroStarScaled,
     "CCN_CroppedImage": CroppedImage,
     "CCN_ImageInset": ImageInset,
@@ -207,6 +209,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_CurveSample": "Curve Sample (CCN)",
     "CCN_CurveDefinition": "Curve (CCN)",
     "CCN_CurveCFGGuider": "Curve CFG Guider (CCN)",
+    "CCN_CurveFromCore": "Curve From Core (CCN)",
+    "CCN_CurveToCore": "Curve To Core (CCN)",
     "CCN_CFGZeroStarScaled": "CFG-Zero* Scaled (CCN)",
     "CCN_CroppedImage": "Cropped Image (CCN)",
     "CCN_ImageInset": "Image Inset (CCN)",
