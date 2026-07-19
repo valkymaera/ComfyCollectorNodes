@@ -1,0 +1,2169 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Custom nodes for ComfyUI — conditioning, latents, LoRA loading, prompt construction, and workflow utilities.">
+      
+      
+      
+        <link rel="canonical" href="https://valkymaera.github.io/ComfyCollectorNodes/nodes/conditioning/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../sampling/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Conditioning - ComfyCollectorNodes</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#conditioning" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ComfyCollectorNodes" class="md-header__button md-logo" aria-label="ComfyCollectorNodes" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ComfyCollectorNodes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Conditioning
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/valkymaera/ComfyCollectorNodes" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valkymaera/ComfyCollectorNodes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ComfyCollectorNodes" class="md-nav__button md-logo" aria-label="ComfyCollectorNodes" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ComfyCollectorNodes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/valkymaera/ComfyCollectorNodes" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valkymaera/ComfyCollectorNodes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conditioning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conditioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-conditioning-is-structured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How conditioning is structured
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoding
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Encoding">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#token-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLIP Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emphasis-encode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emphasis Encode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emphasis-encode-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emphasis Encode Advanced
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concept-direction-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept &amp; direction editing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Concept &amp; direction editing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concept-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hyper-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hyper Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hyper-remap-slim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hyper Remap Slim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-projection-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Projection Removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#magnitude-distribution-shaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Magnitude &amp; distribution shaping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Magnitude &amp; distribution shaping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-normalizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Normalizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-clamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Clamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combining" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Combining">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-lerp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Lerp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-subtract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Subtract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inspection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-inspector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Inspector
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sampling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling & Guidance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lora/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LoRA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image & Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../latent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Latent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prompt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt & Text
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-conditioning-is-structured" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How conditioning is structured
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Encoding
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Encoding">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#token-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clip-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLIP Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emphasis-encode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emphasis Encode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emphasis-encode-advanced" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Emphasis Encode Advanced
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concept-direction-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept &amp; direction editing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Concept &amp; direction editing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concept-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concept Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hyper-remap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hyper Remap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hyper-remap-slim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hyper Remap Slim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-projection-removal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Projection Removal
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#magnitude-distribution-shaping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Magnitude &amp; distribution shaping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Magnitude &amp; distribution shaping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-scale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Scale
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-normalizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Normalizer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-clamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Clamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combining" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Combining
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Combining">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-lerp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Lerp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-subtract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Subtract
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inspection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#conditioning-stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conditioning Stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#token-inspector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token Inspector
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="conditioning">Conditioning<a class="headerlink" href="#conditioning" title="Permanent link">&para;</a></h1>
+<p>Nodes for creating, shaping, editing, combining, and inspecting <code>CONDITIONING</code>.</p>
+<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#token-remap">Token Remap</a></td>
+<td>Encodes a prompt while blending specific words toward alternate meanings at the embedding level.</td>
+</tr>
+<tr>
+<td><a href="#clip-remap">CLIP Remap</a></td>
+<td>Wraps a CLIP model so every downstream encode has your word replacements applied automatically.</td>
+</tr>
+<tr>
+<td><a href="#emphasis-encode">Emphasis Encode</a></td>
+<td>Encodes text with A1111-style <code>(word:weight)</code> emphasis on Wan/T5-style encoders. <em>(Experimental)</em></td>
+</tr>
+<tr>
+<td><a href="#emphasis-encode-advanced">Emphasis Encode Advanced</a></td>
+<td>Emphasis Encode plus a post-emphasis normalization step. <em>(Experimental)</em></td>
+</tr>
+<tr>
+<td><a href="#concept-remap">Concept Remap</a></td>
+<td>Shifts already-encoded conditioning along the direction from one concept to another, targeted to where the concept lives.</td>
+</tr>
+<tr>
+<td><a href="#hyper-remap">Hyper Remap</a></td>
+<td>All-in-one remapper: text replacement, token blending, concept nudging, and delta residuals in a single node.</td>
+</tr>
+<tr>
+<td><a href="#hyper-remap-slim">Hyper Remap Slim</a></td>
+<td>Wire-oriented Hyper Remap with a single output and fewer widgets.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-projection-removal">Conditioning Projection Removal</a></td>
+<td>Suppresses a concept by projecting it out of the positive — a negative prompt substitute for flow models.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-scale">Conditioning Scale</a></td>
+<td>Multiplies the conditioning tensor by a constant to strengthen or weaken it.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-normalizer">Conditioning Normalizer</a></td>
+<td>Applies one of several normalization methods to the tensor, blended by strength.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-clamp">Conditioning Clamp</a></td>
+<td>Clamps every tensor value to a min/max range to tame extremes.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-lerp">Conditioning Lerp</a></td>
+<td>Linearly interpolates between two conditionings.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-subtract">Conditioning Subtract</a></td>
+<td>Subtracts one conditioning from another to conceptually remove an idea.</td>
+</tr>
+<tr>
+<td><a href="#conditioning-stats">Conditioning Stats</a></td>
+<td>Prints shape/min/max/mean/std to the console and passes conditioning through.</td>
+</tr>
+<tr>
+<td><a href="#token-inspector">Token Inspector</a></td>
+<td>Reports how a CLIP model tokenizes a prompt, token by token.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-conditioning-is-structured">How conditioning is structured<a class="headerlink" href="#how-conditioning-is-structured" title="Permanent link">&para;</a></h2>
+<p>In ComfyUI, a <code>CONDITIONING</code> value is a list of <code>[tensor, dict]</code> pairs. The
+tensor holds per-token embeddings with shape <code>[batch, sequence_length,
+embedding_dim]</code> — one vector per token position. The dict carries metadata,
+most commonly <code>pooled_output</code> (a single summary vector) plus any timestep or
+area hints attached upstream.</p>
+<p>The nodes on this page fall into five groups by what they do to that structure:</p>
+<ul>
+<li><strong>Encoding</strong> — turn text into conditioning (replacements for <code>CLIPTextEncode</code>).</li>
+<li><strong>Concept &amp; direction editing</strong> — shift <em>meaning</em> in embedding space.</li>
+<li><strong>Magnitude &amp; distribution shaping</strong> — do math on the tensor values.</li>
+<li><strong>Combining</strong> — merge two conditionings into one.</li>
+<li><strong>Inspection</strong> — report on conditioning without changing it.</li>
+</ul>
+<div class="admonition info">
+<p class="admonition-title">Related</p>
+<p>The <strong>Neutral Prompt</strong> family and the CFG guiders act on conditioning too,
+but at sampling time — they live under
+<a href="../sampling/">Sampling &amp; Guidance</a>. <strong>Conditioning Token Count</strong> is under
+<a href="../utilities/">Utilities</a>.</p>
+</div>
+<hr />
+<h2 id="encoding">Encoding<a class="headerlink" href="#encoding" title="Permanent link">&para;</a></h2>
+<p>These produce conditioning directly from text, in place of a standard
+<code>CLIPTextEncode</code>.</p>
+<h3 id="token-remap">Token Remap<a class="headerlink" href="#token-remap" title="Permanent link">&para;</a></h3>
+<p><strong>Encodes a prompt while blending specific words toward alternate meanings at
+the embedding level — a soft, controllable word swap.</strong></p>
+<p>Useful for disambiguating a word (e.g. nudging "ship" toward "starship")
+without a hard text swap. It encodes the prompt twice, once as written and once
+with your word replacements applied, then blends the two. When the token counts
+match, blending happens only at the positions that changed (precise mode); when
+they differ, it falls back to a global blend of the whole tensor. Use this in
+place of <code>CLIPTextEncode</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>The CLIP model to encode with.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>The prompt.</td>
+</tr>
+<tr>
+<td><code>remappings</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>One <code>source -&gt; target</code> per line. Accepts <code>-&gt;</code>, <code>=&gt;</code>, <code>:</code>, or <code>,</code> as the separator; lines starting with <code>#</code> are comments.</td>
+</tr>
+<tr>
+<td><code>blend</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td><code>0.0</code> = original prompt, <code>1.0</code> = fully remapped. Values outside 0–1 extrapolate in embedding space.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>, <code>text_out</code> (the original text, passed through).</p>
+<!-- TODO: screenshot — Token Remap wired in place of CLIPTextEncode -->
+
+<h3 id="clip-remap">CLIP Remap<a class="headerlink" href="#clip-remap" title="Permanent link">&para;</a></h3>
+<p><strong>Wraps a CLIP model so that <em>every</em> prompt encoded with it has your word
+replacements applied automatically during tokenization.</strong></p>
+<p>Place it before any <code>CLIPTextEncode</code> (or other encoder) and all downstream
+encodes inherit the remap. This is a <strong>hard</strong> remap with no blending — reach
+for Token Remap instead when you want a controllable blend.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>The CLIP model to wrap.</td>
+</tr>
+<tr>
+<td><code>remappings</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>One <code>source -&gt; target</code> per line (same formats as Token Remap).</td>
+</tr>
+<tr>
+<td><code>enabled</code></td>
+<td>BOOLEAN</td>
+<td>true</td>
+<td>When off, the CLIP passes through untouched.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>CLIP</code> (a patched clone; the original is left intact).</p>
+<h3 id="emphasis-encode">Emphasis Encode<a class="headerlink" href="#emphasis-encode" title="Permanent link">&para;</a></h3>
+<p><strong>Encodes text with A1111-style <code>(word:weight)</code> emphasis markers on Wan/T5-style
+encoders that don't natively support them.</strong></p>
+<div class="admonition note">
+<p class="admonition-title">Experimental</p>
+<p>Token boundaries don't map cleanly to word boundaries on these models, so
+emphasis positions are estimated and results are approximate. It works best
+with simple emphasis on individual words or short phrases.</p>
+</div>
+<p>Supported syntax:</p>
+<ul>
+<li><code>(word:1.2)</code> — scale a word's weight by 1.2×</li>
+<li><code>(word:0.5)</code> — reduce emphasis</li>
+<li><code>(several words:1.3)</code> — emphasize a phrase</li>
+<li><code>((word))</code> — shorthand for <code>(word:1.1)</code></li>
+<li>nesting compounds, e.g. <code>((word:1.2))</code> → 1.2 × 1.1</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>The encoder.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>Prompt with optional emphasis markers.</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print token-mapping diagnostics to the console.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>, <code>parsed_info</code> (a summary of detected emphasis),
+<code>debug_output</code> (the full diagnostic string).</p>
+<h3 id="emphasis-encode-advanced">Emphasis Encode Advanced<a class="headerlink" href="#emphasis-encode-advanced" title="Permanent link">&para;</a></h3>
+<p><strong>Emphasis Encode plus a post-emphasis normalization step modeled on A1111's
+emphasis modes.</strong></p>
+<div class="admonition note">
+<p class="admonition-title">Experimental</p>
+<p>Same emphasis parsing as Emphasis Encode; the same caveats apply.</p>
+</div>
+<p>Adds a <code>normalization</code> choice applied after emphasis is baked in, to counteract
+the way weighting shifts the overall distribution of the conditioning.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>The encoder.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>Prompt with optional emphasis markers.</td>
+</tr>
+<tr>
+<td><code>normalization</code></td>
+<td>choice</td>
+<td><code>mean_restore</code></td>
+<td>One of <code>none</code>, <code>mean_restore</code>, <code>max_norm</code>, <code>std_norm</code>. Restores the chosen statistic to its pre-emphasis value.</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print diagnostics to the console.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>, <code>parsed_info</code>, <code>debug_output</code>.</p>
+<hr />
+<h2 id="concept-direction-editing">Concept &amp; direction editing<a class="headerlink" href="#concept-direction-editing" title="Permanent link">&para;</a></h2>
+<p>These edit the <em>meaning</em> carried by conditioning rather than its raw magnitude —
+operating on the direction of embedding vectors.</p>
+<h3 id="concept-remap">Concept Remap<a class="headerlink" href="#concept-remap" title="Permanent link">&para;</a></h3>
+<p><strong>Shifts already-encoded conditioning along the direction from one concept to
+another (e.g. <code>water -&gt; fire</code>), targeted to the positions where the source
+concept is most influential.</strong></p>
+<p>Because the shift follows <em>influence</em> rather than exact token positions, it
+also catches contextual bleed from attention — reflections, color, mood. It
+has two modes for locating that influence:</p>
+<ul>
+<li><strong>Cosine</strong> (default) — encodes the source word separately and uses cosine
+  similarity to estimate where the concept lives. Fast and approximate; doesn't
+  need the original prompt.</li>
+<li><strong>Differential</strong> — when <code>prompt_text</code> is provided, encodes the prompt with and
+  without the source word and measures the actual per-position difference. Much
+  more precise. Falls back to cosine per-pair if it can't apply (word absent
+  from the prompt, token-count mismatch, etc.).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The conditioning to edit.</td>
+</tr>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>Used to encode concept directions.</td>
+</tr>
+<tr>
+<td><code>remappings</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>One <code>source -&gt; target</code> per line.</td>
+</tr>
+<tr>
+<td><code>blend</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Overall strength of the shift. <code>1.0</code> = full direction vector; <code>&gt;1</code> overshoots; negative pushes <em>away</em> from the target.</td>
+</tr>
+<tr>
+<td><code>sharpness</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>How selectively the effect targets matching positions. <code>0</code> = uniform shift everywhere; higher = concentrated on matching positions; negative inverts (affects everything <em>except</em> the source concept).</td>
+</tr>
+<tr>
+<td><code>threshold</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>Minimum influence weight for a position to be affected at all.</td>
+</tr>
+<tr>
+<td><code>prompt_text</code></td>
+<td>STRING</td>
+<td><em>(optional)</em></td>
+<td>The original prompt. Supplying it enables differential mode.</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print per-concept diagnostics.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>, <code>prompt_text_out</code>.</p>
+<!-- TODO: screenshot — cosine vs differential result comparison -->
+
+<h3 id="hyper-remap">Hyper Remap<a class="headerlink" href="#hyper-remap" title="Permanent link">&para;</a></h3>
+<p><strong>One node, four remap operators: literal text replacement, token-level
+embedding blending, concept-direction nudging, and additive delta residuals —
+each line of the remappings box picks its operator by separator.</strong></p>
+<p>Hyper Remap replaces a chain of Token Remap + Concept Remap (and more) with a
+single node. It parses each remapping line, routes it to one of four phases by
+its separator, and runs the phases in a fixed cascade — each phase consuming
+the previous one's output:</p>
+<ol>
+<li><strong>String replacement</strong> (<code>find, replace</code>) — plain-text substitution on the
+   prompt <em>before</em> encoding. Substring match, no embedding math.</li>
+<li><strong>Token remap</strong> (<code>source -&gt; target</code>) — encodes the prompt with the word
+   swapped and blends the two encodings, exactly like the standalone
+   <a href="#token-remap">Token Remap</a> (precise per-position blend when token counts
+   match, global blend otherwise).</li>
+<li><strong>Concept remap</strong> (<code>source =&gt; target</code>) — nudges the conditioning along the
+   source→target direction, weighted by where the source concept is most
+   influential, like the standalone <a href="#concept-remap">Concept Remap</a>.
+   Differential mode is used automatically (the prompt text is known);
+   individual pairs fall back to cosine mode when differential can't apply.</li>
+<li><strong>Delta remap</strong> (<code>base ~~ subtracted</code>) — encodes two arbitrary prompts,
+   subtracts them, and adds the weighted difference into the conditioning as a
+   residual. This injects the semantic <em>difference</em> between two prompts rather
+   than replacing anything.</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>Used for all tokenizing and encoding (prompt, remapped variants, concepts, delta pairs).</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>The main prompt (dynamic prompts supported).</td>
+</tr>
+<tr>
+<td><code>remappings</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>One entry per line or semicolon-separated; <code>#</code> comments allowed. Separator picks the operator: <code>,</code> / <code>-&gt;</code> / <code>=&gt;</code> / <code>~~</code>.</td>
+</tr>
+<tr>
+<td><code>blend</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Default strength for all operators. For <code>-&gt;</code>: lerp between original and remapped. For <code>=&gt;</code> and <code>~~</code>: magnitude of the nudge/delta vector. <code>&gt;1</code> overshoots, negative inverts.</td>
+</tr>
+<tr>
+<td><code>sharpness</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>For <code>=&gt;</code>/<code>~~</code>: how sharply positions are weighted by similarity to the source/base concept. <code>0</code> = uniform; higher = concentrated; negative favors <em>least</em>-similar positions. Ignored by <code>-&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>threshold</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>For <code>=&gt;</code>/<code>~~</code>: masks out positions whose similarity weight falls below this value (only values &gt; 0 activate masking). Ignored by <code>-&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>normalize_delta</code></td>
+<td>BOOLEAN</td>
+<td>true</td>
+<td>L2-normalize the <code>~~</code> delta before blending, so <code>blend</code> has a consistent magnitude regardless of how different the two prompts are.</td>
+</tr>
+<tr>
+<td><code>case_sensitive</code></td>
+<td>BOOLEAN</td>
+<td>true</td>
+<td>Case sensitivity for <code>,</code> string-replacement pairs only.</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print per-phase diagnostics to the console.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code> (after all phases), <code>untouched_conditioning</code> (the
+original text encoded verbatim, for A/B comparison), <code>original_prompt</code>,
+<code>modified_prompt</code> (the text after string replacement).</p>
+<p><strong>Per-line overrides.</strong> Any <code>-&gt;</code>, <code>=&gt;</code>, or <code>~~</code> line can end with a
+parenthetical that overrides the node-level defaults for just that pair:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>ship -&gt; starship (1.5)                      # bare number = blend
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>water =&gt; fire (b:0.8, s:2.0, t:0.1)         # blend, sharpness, threshold
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>bee in wild ~~ insect (b:0.5, sx:2.0, tx:0.1)
+</code></pre></div>
+<p><code>b</code>/<code>s</code>/<code>t</code> mirror the node's blend/sharpness/threshold. <code>~~</code> lines also accept
+<code>sx</code>/<code>tx</code> — an <em>intrinsic</em> sharpness/threshold that weights positions by how
+strongly they contribute to the delta itself, multiplied with the
+similarity-based weighting. String-replacement (<code>,</code>) lines take no overrides.</p>
+<div class="admonition tip">
+<p class="admonition-title">Performance</p>
+<p>Every <code>-&gt;</code> pair costs an extra CLIP encode, every <code>~~</code> pair two, and a
+differential <code>=&gt;</code> pair up to four. Long remap lists multiply encoding time
+accordingly.</p>
+</div>
+<p><strong>Matching rules.</strong> <code>,</code> replacement is a plain substring replace on the text;
+<code>-&gt;</code>, <code>=&gt;</code>, and differential weighting match whole words, case-insensitively.</p>
+<!-- TODO: screenshot — Hyper Remap with a multi-operator remappings box and A/B outputs -->
+
+<h3 id="hyper-remap-slim">Hyper Remap Slim<a class="headerlink" href="#hyper-remap-slim" title="Permanent link">&para;</a></h3>
+<p><strong>Hyper Remap with a wire-only prompt input and a single conditioning output —
+same engine, smaller node.</strong></p>
+<p>Slim runs the identical four-phase pipeline (it calls the same internal
+functions as <a href="#hyper-remap">Hyper Remap</a>), with the same remapping syntax and
+per-line overrides. Differences:</p>
+<ul>
+<li><code>text</code> is input-only (connect it from an upstream STRING output; no text box,
+  no dynamic-prompt expansion).</li>
+<li>Only the remapped <code>conditioning</code> is output — no untouched baseline or prompt
+  strings (this also saves one full encode).</li>
+<li>No <code>debug</code> or <code>case_sensitive</code> options; string replacement is always
+  case-sensitive.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>Used for all encoding.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>STRING (input)</td>
+<td>—</td>
+<td>The prompt, wired from upstream.</td>
+</tr>
+<tr>
+<td><code>remappings</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>Same syntax as Hyper Remap.</td>
+</tr>
+<tr>
+<td><code>blend</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Same as Hyper Remap.</td>
+</tr>
+<tr>
+<td><code>sharpness</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Same as Hyper Remap.</td>
+</tr>
+<tr>
+<td><code>threshold</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>Same as Hyper Remap.</td>
+</tr>
+<tr>
+<td><code>normalize_delta</code></td>
+<td>BOOLEAN</td>
+<td>true</td>
+<td>Same as Hyper Remap.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<h3 id="conditioning-projection-removal">Conditioning Projection Removal<a class="headerlink" href="#conditioning-projection-removal" title="Permanent link">&para;</a></h3>
+<p><strong>Suppresses a concept by projecting it out of the positive conditioning — a
+lightweight, pre-attention alternative to a negative prompt.</strong></p>
+<p>Aimed at flow-based models (Flux, SD3) that don't support CFG-based negatives.
+It collapses the negative conditioning into a single direction vector, then
+removes each positive token's component along that direction.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>positive</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The conditioning to clean up.</td>
+</tr>
+<tr>
+<td><code>negative</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The concept to remove.</td>
+</tr>
+<tr>
+<td><code>scale</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td><code>1.0</code> removes exactly the negative's directional component; <code>&gt;1</code> overcorrects, actively pushing away; <code>0</code> = no effect.</td>
+</tr>
+<tr>
+<td><code>pooling</code></td>
+<td>choice</td>
+<td><code>mean</code></td>
+<td>How to collapse the negative's tokens into one direction: <code>mean</code> (average), <code>max</code> (the single highest-norm token), or <code>weighted_norm</code> (norm-weighted average, emphasizing stronger tokens).</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print projection diagnostics.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Multi-concept negatives</p>
+<p>Pooling averages the whole negative into one direction, which dilutes each
+concept when the negative contains several. For complex negatives, chain
+multiple nodes in sequence, each with a single focused negative.</p>
+</div>
+<hr />
+<h2 id="magnitude-distribution-shaping">Magnitude &amp; distribution shaping<a class="headerlink" href="#magnitude-distribution-shaping" title="Permanent link">&para;</a></h2>
+<p>These do arithmetic on the conditioning tensor's values, leaving token meaning
+in place but changing how strongly or how evenly it drives generation.</p>
+<h3 id="conditioning-scale">Conditioning Scale<a class="headerlink" href="#conditioning-scale" title="Permanent link">&para;</a></h3>
+<p><strong>Multiplies the conditioning tensor by a constant to strengthen or weaken the
+prompt's influence.</strong></p>
+<p>Unlike normalization, this simply amplifies or reduces magnitude with no
+reshaping.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Input.</td>
+</tr>
+<tr>
+<td><code>scale</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Multiplier, <code>0.0</code>–<code>10.0</code>. <code>1.0</code> passes through unchanged.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<h3 id="conditioning-normalizer">Conditioning Normalizer<a class="headerlink" href="#conditioning-normalizer" title="Permanent link">&para;</a></h3>
+<p><strong>Applies a normalization method to the conditioning tensor, then blends the
+result back toward the original by strength.</strong></p>
+<p>Inspired by A1111's emphasis normalization; even without explicit emphasis
+weights, changing the value distribution can subtly shift generation.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Input.</td>
+</tr>
+<tr>
+<td><code>method</code></td>
+<td>choice</td>
+<td><code>none</code></td>
+<td>See methods below.</td>
+</tr>
+<tr>
+<td><code>strength</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Blend between original (<code>0</code>) and fully normalized (<code>1</code>). Values outside 0–1 extrapolate.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Methods:</strong> <code>max_norm</code> (divide by max absolute value), <code>std_norm</code> (divide by
+standard deviation), <code>std_half</code> (gentler, divide by 2×std), <code>zscore</code> (subtract
+mean, divide by std), <code>zscore_avg</code> (average of z-score and max-norm),
+<code>zscore_half</code> (gentler z-score), <code>slight_z</code> (20% z-score, 80% max-norm),
+<code>mean_restore</code> (normalize but restore the original mean), <code>range</code> (rescale to
+<code>[-1, 1]</code>), and hard clamps <code>clamp_1</code>, <code>clamp_1.5</code>, <code>clamp_2</code>.</p>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<h3 id="conditioning-clamp">Conditioning Clamp<a class="headerlink" href="#conditioning-clamp" title="Permanent link">&para;</a></h3>
+<p><strong>Clamps every value in the conditioning tensor to a min/max range.</strong></p>
+<p>Useful for taming extreme values that produce "burn" or artifacts.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Input.</td>
+</tr>
+<tr>
+<td><code>min_value</code></td>
+<td>FLOAT</td>
+<td>-4.0</td>
+<td>Lower bound.</td>
+</tr>
+<tr>
+<td><code>max_value</code></td>
+<td>FLOAT</td>
+<td>4.0</td>
+<td>Upper bound.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<hr />
+<h2 id="combining">Combining<a class="headerlink" href="#combining" title="Permanent link">&para;</a></h2>
+<p>These merge two conditionings into one.</p>
+<h3 id="conditioning-lerp">Conditioning Lerp<a class="headerlink" href="#conditioning-lerp" title="Permanent link">&para;</a></h3>
+<p><strong>Linearly interpolates between two conditionings.</strong></p>
+<p><code>result = a·(1 − blend) + b·blend</code>. If the two have different sequence lengths,
+both are truncated to the shorter before blending. <code>pooled_output</code> is
+interpolated too when both inputs carry it.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning_a</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Endpoint at <code>blend = 0</code>.</td>
+</tr>
+<tr>
+<td><code>conditioning_b</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Endpoint at <code>blend = 1</code>.</td>
+</tr>
+<tr>
+<td><code>blend</code></td>
+<td>FLOAT</td>
+<td>0.5</td>
+<td><code>0.0</code> = all A, <code>0.5</code> = even mix, <code>1.0</code> = all B.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<h3 id="conditioning-subtract">Conditioning Subtract<a class="headerlink" href="#conditioning-subtract" title="Permanent link">&para;</a></h3>
+<p><strong>Subtracts one conditioning from another — a lightweight way to conceptually
+remove an idea.</strong></p>
+<p><code>result = a − b·strength</code>, e.g. a full-scene conditioning minus a "snow"
+conditioning. Sequence lengths are truncated to the shorter; pooled outputs are
+subtracted when present.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning_a</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The base.</td>
+</tr>
+<tr>
+<td><code>conditioning_b</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>What to subtract.</td>
+</tr>
+<tr>
+<td><code>strength</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>How much of B to remove, <code>0.0</code>–<code>5.0</code>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code>.</p>
+<hr />
+<h2 id="inspection">Inspection<a class="headerlink" href="#inspection" title="Permanent link">&para;</a></h2>
+<p>These report on conditioning and pass it through unchanged, so they can sit
+inline in a graph without altering the result.</p>
+<h3 id="conditioning-stats">Conditioning Stats<a class="headerlink" href="#conditioning-stats" title="Permanent link">&para;</a></h3>
+<p><strong>Prints each entry's shape, min, max, mean, standard deviation, and pooled
+keys to the console, and passes the conditioning through untouched.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Input (passed through).</td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td>STRING</td>
+<td><code>Conditioning</code></td>
+<td>Heading printed above the stats.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>conditioning</code> (unchanged).</p>
+<h3 id="token-inspector">Token Inspector<a class="headerlink" href="#token-inspector" title="Permanent link">&para;</a></h3>
+<p><strong>Shows how a CLIP model tokenizes a prompt — every token, its ID, and a
+per-encoder content-token count — as a human-readable string.</strong></p>
+<p>Handy for understanding why a remap or emphasis landed where it did.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>clip</code></td>
+<td>CLIP</td>
+<td>—</td>
+<td>The tokenizer to inspect.</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>STRING</td>
+<td>—</td>
+<td>The prompt to tokenize.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>STRING</code> (the tokenization report).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
