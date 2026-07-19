@@ -47,5 +47,5 @@ switching, and the string manipulation nodes.
 ### [Utilities](utilities.md)
 
 Workflow plumbing: Better Int and Gated Increment counters, Property
-variables, Random Select, Float Lerp, timers, Print, Inspect Tensor, Python
-Exec, JSON loaders, and token counters.
+variables, Random Select, Float Lerp, timers, Print, Inspect Tensor, JSON
+loaders, and token counters.

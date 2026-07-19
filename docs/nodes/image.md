@@ -113,6 +113,7 @@ canvas manages them.)*
 | `mask` | MASK | Full source-size mask: `1.0` inside the crop, `0.0` outside. |
 | `crop_x`, `crop_y` | INT | Top-left corner of the crop in source pixels. |
 | `crop_width`, `crop_height` | INT | Raw crop size in pixels. |
+| `source_image` | IMAGE | The original uncropped source image (passthrough). |
 
 <!-- TODO: screenshot — Cropped Image node with the canvas, corner handles, and dimmed overlay -->
 

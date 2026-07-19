@@ -11,6 +11,9 @@ runs, and general string manipulation.
 | [Prompt Builder B](#prompt-builder-b) | The same builder with technical/style sections (quality, style, mood, motion, general). |
 | [Prompt Store](#prompt-store) | A stateful Prompt Builder — sections persist server-side across runs and can be merged or appended. |
 | [Prompt Store B](#prompt-store-b) | The stateful counterpart of Prompt Builder B; can share a store name with Prompt Store. |
+| [Prompt Store Custom](#prompt-store-custom) | A Prompt Store whose five section headings come from a wired-in headings list instead of being hardcoded. |
+| [Prompt Store Headings](#prompt-store-headings) | Five single-line entries emitting the headings list for Prompt Store Custom. |
+| [Prompt Store Get](#prompt-store-get) | Fetches one stored category from a named store, with a found flag. |
 | [Prompt Store Clear](#prompt-store-clear) | Fully empties a named prompt store. |
 | [Prompt Store List](#prompt-store-list) | Lists every active prompt store and a preview of its contents. |
 | [Compound Prompt](#compound-prompt) | A 4-way mode dropdown that emits three exclusive booleans to switch prompt-composition branches. |
@@ -81,8 +84,9 @@ one store hold both narrative and technical facets of a prompt.
 !!! note "Caching caveat"
     These stateful nodes have no `IS_CHANGED` override, so ComfyUI may cache
     and skip them when their inputs are unchanged. Change an input (or use the
-    `trigger` inputs on Clear/List) to force re-execution and control
-    ordering.
+    `trigger` inputs on Get/Clear/List) to force re-execution and control
+    ordering. The exception is [Prompt Store Get](#prompt-store-get), which
+    overrides `IS_CHANGED` to always re-execute so it never serves stale data.
 
 ### Prompt Store
 
@@ -118,6 +122,82 @@ Identical behavior to [Prompt Store](#prompt-store); its `clear` only resets
 its own five keys, so it coexists with Prompt Store in the same `store_name`.
 
 **Outputs:** `prompt`, plus `quality`, `style`, `mood`, `motion`, `general`.
+
+### Prompt Store Custom
+
+**A Prompt Store with user-defined section headings: wire a
+[Prompt Store Headings](#prompt-store-headings) node into `headings` to name
+the five sections yourself.**
+
+Store mechanics are identical to [Prompt Store](#prompt-store). Each heading
+becomes that section's store key — lowercased and whitespace-trimmed, so
+[Prompt Store Get](#prompt-store-get) finds it by name — while
+`prefix_sections` uses the heading with its original casing. Empty headings
+(or an unwired `headings` input) fall back to generic `section_N` keys.
+When a headings node is connected, the editor relabels the five text boxes
+and section outputs live; that relabeling is cosmetic — with the headings
+node bypassed or muted, execution falls back to the generic keys even if
+labels still show custom text.
+
+A few consequences of headings being store keys: duplicate headings collapse
+into one shared key (emitted once in `prompt`); changing headings between
+runs leaves the old keys' data orphaned in the store (use `clear` or
+[Prompt Store Clear](#prompt-store-clear)); and a heading that matches a
+Prompt Store / Prompt Store B key in the same `store_name` reads and writes
+that same section — useful deliberately, surprising by accident.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `store_name` | STRING | `default` | Which named store to read/write. |
+| `delimiter` | STRING | `\n\n` | Joins sections in the `prompt` output. |
+| `prefix_sections` | BOOLEAN | false | Prefix sections with their headings. |
+| `clear` | BOOLEAN | false | Reset this node's five effective keys before applying new input. |
+| `input_mode` | choice | `override` | `override` / `merge` / `append`, as in Prompt Store. |
+| `separator` | STRING | `", "` | Separator used by merge/append. |
+| `section_1`–`section_5` | STRING | `""` | New section text (empty = keep stored). |
+| `headings` | CCN_PROMPT_HEADINGS | *(optional)* | Wire from Prompt Store Headings to name the sections. |
+| `debug` | BOOLEAN | false | Print clear/update messages with the resolved keys. |
+
+**Outputs:** `prompt`, plus each stored section as `section_1`–`section_5`
+(relabeled to the headings in the editor when connected).
+
+### Prompt Store Headings
+
+**Five single-line text entries bundled into the headings list consumed by
+Prompt Store Custom.**
+
+Each entry names the corresponding section; empty entries leave that section
+on its generic `section_N` key. Editing a heading updates the connected store
+node's labels immediately.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `heading_1`–`heading_5` | STRING | `""` | Heading for the corresponding section. |
+
+**Outputs:** `headings` (CCN_PROMPT_HEADINGS).
+
+### Prompt Store Get
+
+**Fetches a single stored category from a named store, returning its text and
+a `found` flag.**
+
+The read-only counterpart to the store nodes: look up one category (section
+key such as `scene` or `mood`) by name and branch on whether data exists. The
+lookup never creates a store or key as a side effect, and the category name is
+matched case-insensitively with surrounding whitespace ignored. `found` is
+false when the store or category doesn't exist *or* when the category holds an
+empty string (e.g. after a store node's `clear` toggle); in both cases `value`
+is `""`. Unlike the rest of the family, this node always re-executes, so it
+always reflects the store's current contents.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `store_name` | STRING | `default` | The store to read from. |
+| `category` | STRING | `""` | The category (section key) to fetch, e.g. `metadata`, `style`. |
+| `trigger` | any | *(optional)* | Execution-order dependency (value unused) — wire a store node's output here to fetch after it writes. |
+
+**Outputs:** `value` (the stored text, or `""`), `found` (true only when the
+category holds non-empty text).
 
 ### Prompt Store Clear
 

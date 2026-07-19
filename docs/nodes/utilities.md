@@ -17,7 +17,6 @@ small math helpers.
 | [Timer Start / Timer Stop](#timer-start-timer-stop) | Measure wall-clock time between two points in a graph. |
 | [Print](#print) | Prints a custom message to the console when it executes. |
 | [Inspect Tensor](#inspect-tensor) | Type-aware inspection of any value, with pass-through. |
-| [Python Exec](#python-exec) | Runs arbitrary Python code on up to 3 inputs. Powerful and dangerous. |
 | [Load JSON File](#load-json-file) | Loads a JSON file from the input directory via a dropdown. |
 | [Load JSON File Path](#load-json-file-path) | Loads a JSON file from an arbitrary path. |
 | [Token Counter](#token-counter) | Counts a prompt's tokens against the model's budget. |
@@ -218,30 +217,6 @@ Insert it inline anywhere without breaking a connection.
 | `data` | any | *(optional)* | The value to inspect. |
 
 **Outputs:** `passthrough` (the input, unchanged), `info` (the report).
-
-### Python Exec
-
-**Executes arbitrary Python code you type into the node, with up to three
-inputs available as `input_1`–`input_3` and `torch` in scope; whatever you
-assign to `result` becomes the output.**
-
-`print()` output is captured and returned as a string (and echoed to the
-console). Exceptions don't fail the graph — they come back as an `ERROR:`
-string.
-
-!!! danger "Arbitrary code execution"
-    This node runs unrestricted Python with the full privileges of the
-    ComfyUI process — it can read and write files, run commands, and access
-    the network. Only use it in workflows you trust, and never load untrusted
-    workflow JSON containing it on a shared or remote instance.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `code` | STRING | `print('Hello!')`… | The code to run. |
-| `input_1`–`input_3` | any | *(optional)* | Values exposed to the code. |
-
-**Outputs:** `result` (whatever the code assigned), `output` (captured
-stdout, or the error string).
 
 ---
 

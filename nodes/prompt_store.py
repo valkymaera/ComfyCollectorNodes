@@ -55,6 +55,27 @@ def _apply_input_mode(existing, new, mode, separator):
     return new  # Fallback to override
 
 
+_GENERIC_KEYS = ["section_1", "section_2", "section_3", "section_4", "section_5"]
+
+
+def _resolve_heading_keys(headings):
+    """Resolve a headings list into (store_keys, display_names).
+
+    Store keys are lowercased so PromptStoreGet's case-insensitive lookup
+    finds them; display names keep the user's casing. Empty or missing
+    headings fall back to the generic section_N names.
+    """
+    keys = []
+    names = []
+    for i in range(5):
+        heading = ""
+        if isinstance(headings, (list, tuple)) and i < len(headings):
+            heading = str(headings[i]).strip()
+        keys.append(heading.lower() if heading else _GENERIC_KEYS[i])
+        names.append(heading if heading else _GENERIC_KEYS[i])
+    return keys, names
+
+
 class PromptStore:
     """
     Stores and retrieves prompt sections with session memory.
@@ -262,6 +283,173 @@ class PromptStoreB:
             store.get("motion", ""),
             store.get("general", ""),
         )
+
+
+class PromptStoreCustom:
+    """
+    Stores and retrieves prompt sections with session memory (custom headings).
+
+    Works like PromptStore, but the five section headings come from a
+    CCN_PROMPT_HEADINGS input (wire from PromptStoreHeadings). Headings
+    name the store keys and section prefixes; empty or unwired headings
+    fall back to generic section_N keys.
+
+    Input modes:
+      - override: Replace stored value with new input
+      - merge: Combine unique delimiter-separated values (no duplicates)
+      - append: Add new input to end of existing value
+
+    Empty inputs = keep previous value (don't change)
+    """
+
+    CATEGORY = "ComfyCollectorNodes/Prompt"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "store_name": ("STRING", {"default": "default"}),
+                "delimiter": ("STRING", {"default": "\\n\\n"}),
+                "prefix_sections": ("BOOLEAN", {"default": False}),
+                "clear": ("BOOLEAN", {"default": False}),
+                "input_mode": (INPUT_MODES, {"default": "override"}),
+                "separator": ("STRING", {"default": ", "}),
+            },
+            "optional": {
+                "section_1": ("STRING", {"default": "", "multiline": True}),
+                "section_2": ("STRING", {"default": "", "multiline": True}),
+                "section_3": ("STRING", {"default": "", "multiline": True}),
+                "section_4": ("STRING", {"default": "", "multiline": True}),
+                "section_5": ("STRING", {"default": "", "multiline": True}),
+                "headings": ("CCN_PROMPT_HEADINGS", {"tooltip": "Wire from Prompt Store Headings to name the five sections."}),
+                "debug": ("BOOLEAN", {"default": False}),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("prompt", "section_1", "section_2", "section_3", "section_4", "section_5")
+    FUNCTION = "process_prompt"
+
+    def process_prompt(self, store_name, delimiter, prefix_sections, clear, input_mode, separator,
+                       section_1="", section_2="", section_3="", section_4="", section_5="",
+                       headings=None, debug=False):
+        # Handle escaped characters
+        delimiter = delimiter.replace("\\n", "\n").replace("\\t", "\t")
+
+        store = _get_store(store_name)
+        keys, names = _resolve_heading_keys(headings)
+
+        # Clear only this node's effective keys if requested
+        if clear:
+            for key in keys:
+                store[key] = ""
+            if debug:
+                print(f"[ComfyCollectorNodes] Prompt store '{store_name}' cleared (PromptStoreCustom keys: {', '.join(keys)})")
+
+        # Update sections using input mode
+        values = [section_1, section_2, section_3, section_4, section_5]
+
+        updated = []
+        for key, value in zip(keys, values):
+            if value and value.strip():
+                existing = store.get(key, "")
+                store[key] = _apply_input_mode(existing, value, input_mode, separator)
+                updated.append(key)
+
+        if updated and debug:
+            print(f"[ComfyCollectorNodes] Prompt store '{store_name}' updated ({input_mode}): {', '.join(updated)}")
+
+        # Build final prompt from stored values; duplicate headings share a
+        # store key, so emit each key only once
+        parts = []
+        seen = set()
+        for key, name in zip(keys, names):
+            if key in seen:
+                continue
+            seen.add(key)
+            val = store.get(key, "")
+            if val:
+                if prefix_sections:
+                    parts.append(f"{name}: {val}")
+                else:
+                    parts.append(val)
+
+        result = delimiter.join(parts)
+
+        return (
+            result,
+            store.get(keys[0], ""),
+            store.get(keys[1], ""),
+            store.get(keys[2], ""),
+            store.get(keys[3], ""),
+            store.get(keys[4], ""),
+        )
+
+
+class PromptStoreHeadings:
+    """
+    Defines the five section headings for PromptStoreCustom.
+
+    Empty entries fall back to the generic section_N keys on the store node.
+    """
+
+    CATEGORY = "ComfyCollectorNodes/Prompt"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "heading_1": ("STRING", {"default": ""}),
+                "heading_2": ("STRING", {"default": ""}),
+                "heading_3": ("STRING", {"default": ""}),
+                "heading_4": ("STRING", {"default": ""}),
+                "heading_5": ("STRING", {"default": ""}),
+            },
+        }
+
+    RETURN_TYPES = ("CCN_PROMPT_HEADINGS",)
+    RETURN_NAMES = ("headings",)
+    FUNCTION = "build"
+
+    def build(self, heading_1, heading_2, heading_3, heading_4, heading_5):
+        return ([heading_1, heading_2, heading_3, heading_4, heading_5],)
+
+
+class PromptStoreGet:
+    """
+    Fetches a single stored category from a named prompt store.
+
+    Read-only: never creates a store or key as a side effect.
+    found is True only when the category holds non-empty text.
+    """
+
+    CATEGORY = "ComfyCollectorNodes/Prompt"
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "store_name": ("STRING", {"default": "default"}),
+                "category": ("STRING", {"default": ""}),
+            },
+            "optional": {
+                "trigger": ("*",),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "BOOLEAN")
+    RETURN_NAMES = ("value", "found")
+    FUNCTION = "get_value"
+
+    @classmethod
+    def IS_CHANGED(cls, store_name, category, trigger=None):
+        # Always re-execute: the store mutates without this node's inputs changing
+        return float("NaN")
+
+    def get_value(self, store_name, category, trigger=None):
+        store = _prompt_stores.get(store_name, {})
+        value = store.get(category.strip().lower(), "")
+        return (value, bool(value))
 
 
 class PromptStoreClear:

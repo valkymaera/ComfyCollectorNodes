@@ -14,7 +14,7 @@ All nodes appear in the ComfyUI menu with a `(CCN)` suffix.
 - **[Image & Video](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/)** — interactive crop and inset-compositing canvases, resize/blend helpers, index-based image/video loaders, and a Video Scrubber that picks an exact frame with an in-node preview.
 - **[Latent](https://valkymaera.github.io/ComfyCollectorNodes/nodes/latent/)** — clamp/scale/normalize latents and adjust individual channels (4- and 16-channel variants).
 - **[Prompt & Text](https://valkymaera.github.io/ComfyCollectorNodes/nodes/prompt/)** — structured prompt builders, persistent prompt stores that accumulate across runs, and string utilities.
-- **[Utilities](https://valkymaera.github.io/ComfyCollectorNodes/nodes/utilities/)** — self-incrementing ints, rate-gated counters, named Property variables, timers, token counters, tensor inspection, and a Python Exec escape hatch.
+- **[Utilities](https://valkymaera.github.io/ComfyCollectorNodes/nodes/utilities/)** — self-incrementing ints, rate-gated counters, named Property variables, timers, token counters, and tensor inspection.
 
 ## Install
 

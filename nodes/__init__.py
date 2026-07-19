@@ -25,9 +25,9 @@ from .latent_utils import LatentClamp, LatentScale, LatentNormalize, LatentStats
 from .latent_channel import LatentChannelOffset, LatentChannelOffset16, LatentChannelScale, LatentChannelScale16
 from .prompt_builder import PromptBuilder
 from .prompt_builder_b import PromptBuilderB
-from .prompt_store import PromptStore, PromptStoreB, PromptStoreClear, PromptStoreList
+from .prompt_store import PromptStore, PromptStoreB, PromptStoreClear, PromptStoreCustom, PromptStoreGet, PromptStoreHeadings, PromptStoreList
 from .emphasis_encode import EmphasisEncode, EmphasisEncodeAdvanced
-from .python_exec import PythonExec, InspectTensor
+from .inspect_tensor import InspectTensor
 from .image_utils import ResizeByShorterEdge, ResizeToMatch, ImageBlend
 from .dimension_scale import DimensionScale
 from .json_utils import LoadJSONFile, LoadJSONFilePath
@@ -92,10 +92,12 @@ NODE_CLASS_MAPPINGS = {
     "CCN_PromptStore": PromptStore,
     "CCN_PromptStoreB": PromptStoreB,
     "CCN_PromptStoreClear": PromptStoreClear,
+    "CCN_PromptStoreCustom": PromptStoreCustom,
+    "CCN_PromptStoreGet": PromptStoreGet,
+    "CCN_PromptStoreHeadings": PromptStoreHeadings,
     "CCN_PromptStoreList": PromptStoreList,
     "CCN_EmphasisEncode": EmphasisEncode,
     "CCN_EmphasisEncodeAdvanced": EmphasisEncodeAdvanced,
-    "CCN_PythonExec": PythonExec,
     "CCN_InspectTensor": InspectTensor,
     "CCN_RandomSelect": RandomSelect,
     "CCN_ResizeByShorterEdge": ResizeByShorterEdge,
@@ -169,10 +171,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_PromptStore": "Prompt Store (CCN)",
     "CCN_PromptStoreB": "Prompt Store B (CCN)",
     "CCN_PromptStoreClear": "Prompt Store Clear (CCN)",
+    "CCN_PromptStoreCustom": "Prompt Store Custom (CCN)",
+    "CCN_PromptStoreGet": "Prompt Store Get (CCN)",
+    "CCN_PromptStoreHeadings": "Prompt Store Headings (CCN)",
     "CCN_PromptStoreList": "Prompt Store List (CCN)",
     "CCN_EmphasisEncode": "Emphasis Encode [EXPERIMENTAL] (CCN)",
     "CCN_EmphasisEncodeAdvanced": "Emphasis Encode Advanced [EXPERIMENTAL] (CCN)",
-    "CCN_PythonExec": "Python Exec (CCN)",
     "CCN_InspectTensor": "Inspect Tensor (CCN)",
     "CCN_RandomSelect": "Random Select (CCN)",
     "CCN_ResizeByShorterEdge": "Resize By Shorter Edge (CCN)",

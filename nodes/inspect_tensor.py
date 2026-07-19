@@ -1,77 +1,8 @@
 """
-Python Exec - Execute arbitrary Python code for debugging
+Inspect Tensor - Quick inspection of tensor-like values
 """
 
 import torch
-
-
-class PythonExec:
-    """
-    Execute arbitrary Python code for debugging and experimentation.
-    
-    Available variables in your code:
-      - input_1, input_2, input_3: Your connected inputs (or None)
-      - torch: PyTorch module
-      - result: Set this to return a value
-    
-    Example code:
-      print(f"Input type: {type(input_1)}")
-      print(f"Input shape: {input_1.shape}")
-      result = input_1 * 2
-    
-    WARNING: This executes arbitrary code. Use responsibly.
-    """
-    
-    CATEGORY = "ComfyCollectorNodes/Utils"
-    
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "code": ("STRING", {"default": "print('Hello!')\nresult = input_1", "multiline": True}),
-            },
-            "optional": {
-                "input_1": ("*",),
-                "input_2": ("*",),
-                "input_3": ("*",),
-            },
-        }
-
-    RETURN_TYPES = ("*", "STRING")
-    RETURN_NAMES = ("result", "output")
-    FUNCTION = "execute"
-
-    def execute(self, code, input_1=None, input_2=None, input_3=None):
-        # Build execution context
-        local_vars = {
-            "input_1": input_1,
-            "input_2": input_2,
-            "input_3": input_3,
-            "torch": torch,
-            "result": None,
-        }
-        
-        # Capture print output
-        import io
-        import sys
-        
-        old_stdout = sys.stdout
-        sys.stdout = captured_output = io.StringIO()
-        
-        try:
-            exec(code, {"__builtins__": __builtins__}, local_vars)
-            output = captured_output.getvalue()
-        except Exception as e:
-            output = f"ERROR: {type(e).__name__}: {e}"
-            print(f"[ComfyCollectorNodes] PythonExec error: {e}")
-        finally:
-            sys.stdout = old_stdout
-        
-        # Also print to console
-        if output:
-            print(f"[CCN PythonExec Output]\n{output}")
-        
-        return (local_vars.get("result"), output)
 
 
 class InspectTensor:

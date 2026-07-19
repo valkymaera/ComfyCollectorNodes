@@ -63,16 +63,18 @@ class CroppedImage:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "IMAGE", "MASK", "INT", "INT", "INT", "INT")
+    RETURN_TYPES = ("IMAGE", "IMAGE", "MASK", "INT", "INT", "INT", "INT", "IMAGE")
     RETURN_NAMES = (
         "image", "raw_image", "mask",
         "crop_x", "crop_y", "crop_width", "crop_height",
+        "source_image",
     )
     FUNCTION = "crop"
     DESCRIPTION = (
         "Interactive visual crop.  Drag corners on the canvas preview to "
         "define a crop region.  'image' output is resized to model-friendly "
-        "dimensions (floored to snap_to); 'raw_image' is the exact pixel crop."
+        "dimensions (floored to snap_to); 'raw_image' is the exact pixel crop; "
+        "'source_image' passes through the original uncropped image."
     )
 
     @classmethod
@@ -185,7 +187,7 @@ class CroppedImage:
                 # Reported so the JS can label which source actually ran.
                 "ccn_crop_source": [source_label],
             },
-            "result": (friendly, raw_crop, mask, x1, y1, crop_w, crop_h),
+            "result": (friendly, raw_crop, mask, x1, y1, crop_w, crop_h, src),
         }
 
     @classmethod
