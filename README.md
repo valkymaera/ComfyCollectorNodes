@@ -43,7 +43,7 @@ The [Cropped Image](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image
 
 <img width="435" height="695" alt="image" src="https://github.com/user-attachments/assets/029c3954-008a-4dc8-881e-cdbd5b7a1a0b" />
 
-you can lock the ratio of the crop, drag in the center to move it, drag the corners to resize. It outputs the cropped image, or the raw_image (uncropped), or some details about the crop.
+you can lock the ratio of the crop, drag in the center to move it, drag the corners to resize. It outputs the cropped image, or the raw_image (cropped but not resampled), or the source image, or some details about the crop.
 If you are wiring an image in, you can click "Load Preview" to 'pull' the image from upstream without having to execute the workflow, (if it exists).
 
 This node prioritizes wired input, overriding any loaded image set in the widget. But if nothing is wired, it acts like a normal image input.
