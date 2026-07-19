@@ -146,6 +146,12 @@ If you wanted to generate an image that was simply a flower, how would you go ab
 This delta remapping is an early experimental exploration in just that: can we take the vector difference of "macrophotography of a bee in a wild", and subtract "Bee, insect", 
 apply that delta to the conditioning and increase the weight of the flower that would remain in the image?
 
+The answer is: Sometimes. Kinda. It works well for some models and not so well for others. 
+The manifold of where training has reliable results from tensor values can be sensitive, and sometimes applying a delta can push the context into a less defined space.
+
+I am still exploring the space, but overall the concept and delta remaps have provided a soft helper for models that don't support actual negative conditioning.
+
+
 
 
 
