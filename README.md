@@ -1,6 +1,8 @@
 # ComfyCollectorNodes
 
 A set of nodes I needed and that you can also have, too, as well.
+Most of these nodes are tinker-related; normalization, scaling, latent channel adjustment, some custom loaders with QoL features.
+There are a few that hit a good niche I think was missing, and I've detailed a few of those below.
 
 **📖 Full documentation: [valkymaera.github.io/ComfyCollectorNodes](https://valkymaera.github.io/ComfyCollectorNodes/)**
 
