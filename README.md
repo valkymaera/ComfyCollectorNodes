@@ -20,3 +20,102 @@ All nodes appear in the ComfyUI menu with a `(CCN)` suffix.
 
 Clone into `ComfyUI/custom_nodes/` and restart ComfyUI. See
 [Getting Started](https://valkymaera.github.io/ComfyCollectorNodes/getting-started/) for details.
+
+
+Below are some nodes I've gotten the most mileage out of, that might be of particular interest.
+
+
+# Signature Video/Image nodes
+
+## Video Scrubber
+The [video Scrubber](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#video-scrubber) uploads or selects a video to input as normal, but allows you to scrub through to seek a specific single frame instead of a video clip. 
+
+<img width="797" height="744" alt="image" src="https://github.com/user-attachments/assets/88693843-9676-4817-a911-2775a5baffa1" />
+
+This is for image extraction from a video, not video clipping. The outputs are the single frame, the index of that frame, and the total frames in the video.
+You can scrub in the timeline or step through with the arrows or seek directly by frame input.
+There is a step value input that changes how many frames are skipped when you step manually.
+
+The frame is an estimation (which is almost always going to be good enough), but if you need exactly the precise frame at the precise index, you can fetch it with the Load Exact Frame button,
+which decodes the video up to that point to calculate it and caches it in your Input/Video Scrubber Frames folder.
+
+## Cropped Image
+The [Cropped Image](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#cropped-image) node is like the standard image input node, but it lets you visually define the cropped area.
+*Important: cropped images are stored in your comfyui temp folder* for use in execution, which is cleared the next time you start comfyui.
+
+<img width="435" height="695" alt="image" src="https://github.com/user-attachments/assets/029c3954-008a-4dc8-881e-cdbd5b7a1a0b" />
+
+you can lock the ratio of the crop, drag in the center to move it, drag the corners to resize. It outputs the cropped image, or the raw_image (cropped but not resampled), or the source image, or some details about the crop.
+If you are wiring an image in, you can click "Load Preview" to 'pull' the image from upstream without having to execute the workflow, (if it exists).
+
+This node prioritizes wired input, overriding any loaded image set in the widget. But if nothing is wired, it acts like a normal image input.
+Note that for wired input from a video scrubber the pixel size preview at the bottom of the node will give you a smaller pixel size than the actual output.
+This is because it uses the html preview of the connected node rather than interacting with the video. The output will still be the correct size.
+If you load the exact frame in the video (which then gets cached), loading the preview will give you accurate size again. This info bug will not affect output.
+
+## Image Inset
+The [Image Inset](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#image-inset) node places up to three images in the canvas of a base image.
+You can rescale them and move them. By default the ratio is locked to the incoming image ratio. Each image gets its own rect.
+
+<img width="442" height="675" alt="image" src="https://github.com/user-attachments/assets/593f119d-ee0c-44b9-b780-5643301c8aba" />
+
+Like cropped image, you can treat this as a normal image node for the base image, or accept it via wire, and can load the preview with a button to 'pull' from upstream.
+Inputs for embedded images that are disconnected are ignored and will not get a placement rectangle.
+
+## All Together
+
+<img width="2214" height="1198" alt="image" src="https://github.com/user-attachments/assets/9c067a1a-2a34-4130-89f6-2a6df5c35d92" />
+
+Here's an example chaining the above together; scrubbing a video for the perfect frame to crop and inset the replacement image for (using another cropped image as the inset). 
+The prompt asks to replace the pegasus with the spaceship.
+
+<img width="1230" height="757" alt="image" src="https://github.com/user-attachments/assets/b1590006-7e8a-4a3a-9dfe-bdfd068bc957" />
+
+# Signature Prompt nodes
+
+This comes with three base "prompt stores". Each is primarily a helper that outputs a structured prompt from text input placed in categories. 
+By default it automatically adds the category names to the prompt ahead of the text, but this can be disabled. For example, whatever you put in the 'metadata' section will be prepended by "metadata: " followed by your text.
+
+These nodes provide extra value in that they store your prompt in session memory (not a file), associated with the category and the store name.
+So if you have a store named "action_shots" and you set the mood category to "dark, gritty, and chaotic", the next time you use a prompt store of the same name it will use that value.
+If the mode is set to override, then putting something else in the mood category will overwrite it. If it's set to merge, then it will split your input at the separator (comma by default), 
+and append it minus anything that already exists. And append simply adds it to what exists.
+
+The storage is per session, not per workflow, so you can retrieve it across many workflows until comfy is restarted or you clear it yourself.
+
+At any time you can access any category you stored by using a PromptStoreGet node.
+If you want to load all the categories you stored for a store name, you can just use an empty prompt store node's outpout, with the appropriate name (just don't set it to clear).
+
+There is a simpler variant called "PromptBuilder" that does not store anything to memory, just provides an easy way to block out prompts into categories.
+
+# Signature Curve
+This package has curves, curve evaluation, and curve guiders that work for nodes 1.0.
+I recognize that there are now curves native in nodes 2.0. But there weren't when I started this. So... now there are more options. For QoL there is a curve converter between comfy's and CCN curves.
+
+<img width="830" height="933" alt="image" src="https://github.com/user-attachments/assets/67509de4-69bf-4adc-92a8-91d4ab27420e" />
+
+There are three curve nodes apart from the converters.
+One is just a curve itself, which can be handed off to the other two.
+Another is a sampler which just samples a normalized point along the curve to provide a corresponding float value.
+The last is a curve-integrated CFG guider to use with custom samplers. Each has its own curve widget or can take a wired-in one.
+
+
+# Special Condition Tinkering
+
+This project is a conceptual port of the "Neutral Prompt" mechanism from Ijleb under the MIT License: https://github.com/ljleb/sd-webui-neutral-prompt which I used a ton in Automatic1111.
+
+This allows powerful orthagonal prompt/conditioning combination instead of a basic merge. 
+Somewhat oversimplifying but basically: 
+Perpendicular mode zeroes the dot product of the auxiliary prompt, basically removing overlap or conflict. 
+Salient mode gives priority for elements to the prompt that seems to care the most about it, using the weight to determine how much the aux is applied where it wins.
+Top-K mode selects only the strongest activations of the auxiliary conditioning to merge into the main on top (not replacing). 
+
+The results are much more fine-tuned combinations of multiple concepts and detail injection.
+
+
+
+
+
+
+
+
