@@ -38,7 +38,8 @@ The frame is an estimation (which is almost always going to be good enough), but
 which decodes the video up to that point to calculate it and caches it in your Input/Video Scrubber Frames folder.
 
 ## Cropped Image
-The [Cropped Image](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#cropped-image) node is a standard image input node that lets you visually define the cropped area.
+The [Cropped Image](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#cropped-image) node is like the standard image input node, but it lets you visually define the cropped area.
+*Important: cropped images are stored in your comfyui temp folder* for use in execution, which is cleared the next time you start comfyui.
 
 <img width="435" height="695" alt="image" src="https://github.com/user-attachments/assets/029c3954-008a-4dc8-881e-cdbd5b7a1a0b" />
 
