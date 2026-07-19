@@ -102,7 +102,9 @@ The last is a curve-integrated CFG guider to use with custom samplers. Each has 
 
 # Special Condition Tinkering
 
+## Neutral Prompt Nodes
 This project is a conceptual port of the "Neutral Prompt" mechanism from Ijleb under the MIT License: https://github.com/ljleb/sd-webui-neutral-prompt which I used a ton in Automatic1111.
+The nodes are model agnostic but some will respond better than others at various weights.
 
 This allows powerful orthagonal prompt/conditioning combination instead of a basic merge. 
 Somewhat oversimplifying but basically: 
@@ -110,7 +112,39 @@ Perpendicular mode zeroes the dot product of the auxiliary prompt, basically rem
 Salient mode gives priority for elements to the prompt that seems to care the most about it, using the weight to determine how much the aux is applied where it wins.
 Top-K mode selects only the strongest activations of the auxiliary conditioning to merge into the main on top (not replacing). 
 
-The results are much more fine-tuned combinations of multiple concepts and detail injection.
+The results grant special tinker-level ability to blend concepts and inject details.
+This package suite comes with single node application of a neutral prompt strategy (which can be chained) as well as a 'Neutral Prompt Entry' where an auxiliary conditioning
+can be added to a growing queue of strategic applications, and a neutral prompt guider that applies these directly to provide a guider and sigmas for custom samplers (with curve sampling).
+
+## Hyper-remap
+A multifunctional prompt and condition tinkering node. It has up to four layers of modification with different abstraction from the original prompt. This is a tinkering node, the results
+will vary depending on the model. It is primarily used as an experimenting surface, since it modifies concepts and tokens which can vary in results from model to model.
+Note that except for string replacement, all of these require re-encoding conditioning in multiple passes. For most things this is pretty fast, but for some vision-encoding models this may add 
+noticeable seconds to your workflow execution time.
+
+### String replace
+The first, simplest use is string replace. Comma separated values swap the first value with the second in the prompt directly. "red, blue" replaces "red" with "blue". This one is consistent across models, naturally.
+
+### Token Remap 
+Weighted token remapping uses arrow pairs (source -> target) to encode the prompt twice and blend embeddings at changed positions. The text is NOT modified — this is embedding-space only.
+This lets you blend partway between red and blue in the remap, rather than entirely swap one word out for the other. Because it is token-based rather than word-based, some use cases may not have 
+the intended effect, and some models or CLIP formats may be resilient.
+
+### Concept Remap
+fat-arrow pairs (source => target) nudge the conditioning along concept-direction vectors.  Position weights are derived from cosine similarity between each incoming conditioning position and the source concept vector.
+As a differential remap of the concept rather than individual tokens, this remapping can effect related and adjacent elements in the scene along the vector, like lighting or palette or composition and setting details.
+
+### Delta Remap
+Two tildes specify a special delta remap as A\~\~B. This takes two arbitrary prompts A and B on either side of the tildes, which don't have to be related to the main prompt, 
+encodes them both and determines the vector difference as A without B. It then adds that delta into your prompt's conditioning to give it a nudge in that abstract direction. 
+For example, you could use "beach\~\~bright tropical summer" to get the differential vector between a beach and a tropical summer, and add that to the outbound conditioning. 
+This aspect is highly experimental. The original purpose was to experiment with bringing out details that a model may have knowledge of without being given token data for.
+
+For example, imagine a model that was never trained on flowers and plants or any words related to flowers and plants, but it was trained on many images of bees in the wild.
+We know that the flowers themselves do exist in the data, just in the context of photos of bees only, not appropriately labeled as plants.
+If you wanted to generate an image that was simply a flower, how would you go about doing that? 
+This delta remapping is an early experimental exploration in just that: can we take the vector difference of "macrophotography of a bee in a wild", and subtract "Bee, insect", 
+apply that delta to the conditioning and increase the weight of the flower that would remain in the image?
 
 
 
