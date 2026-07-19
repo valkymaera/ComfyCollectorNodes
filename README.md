@@ -106,7 +106,7 @@ The last is a curve-integrated CFG guider to use with custom samplers. Each has 
 # Special Condition Tinkering
 
 ## Neutral Prompt Nodes
-This project is a conceptual port of the "Neutral Prompt" mechanism from Ijleb under the MIT License: https://github.com/ljleb/sd-webui-neutral-prompt which I used a ton in Automatic1111.
+These nodes are a conceptual port of the "Neutral Prompt" mechanism from Ijleb under the MIT License: https://github.com/ljleb/sd-webui-neutral-prompt which I used a ton in Automatic1111.
 The nodes are model agnostic but some will respond better than others at various weights.
 
 This allows powerful orthagonal prompt/conditioning combination instead of a basic merge. 
