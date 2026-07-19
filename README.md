@@ -143,7 +143,7 @@ This aspect is highly experimental. The original purpose was to experiment with 
 For example, imagine a model that was never trained on flowers and plants or any words related to flowers and plants, but it was trained on many images of bees in the wild.
 We know that the flowers themselves do exist in the data, just in the context of photos of bees only, not appropriately labeled as plants.
 If you wanted to generate an image that was simply a flower, how would you go about doing that? 
-This delta remapping is an early experimental exploration in just that: can we take the vector difference of "macrophotography of a bee in a wild", and subtract "Bee, insect", 
+This delta remapping is an early experimental exploration in just that: can we take the vector difference of "macrophotography of a bee in the wild", and subtract "Bee, insect", 
 apply that delta to the conditioning and increase the weight of the flower that would remain in the image?
 
 The answer is: Sometimes. Kinda. It works well for some models and not so well for others. 
