@@ -1,6 +1,6 @@
 # LoRA
 
-Nodes for loading LoRAs — by index, filtered, or several at once — and for
+Nodes for loading LoRAs — by index or filtered — and for
 working with LoRA files themselves: rescaling, shrinking, and inspecting them.
 
 ## At a glance
@@ -9,7 +9,6 @@ working with LoRA files themselves: rescaling, shrinking, and inspecting them.
 |------|---------|
 | [LoRA Loader By Index](#lora-loader-by-index) | Loads a LoRA by its numeric position in a sorted directory listing — built for sweeping a collection across runs. |
 | [LoRA Loader Filtered](#lora-loader-filtered) | The built-in LoRA loader with a dropdown sortable by date, name, or size (newest-first by default). |
-| [Multi LoRA Loader x4 / x8 / x12](#multi-lora-loader-x4-x8-x12) | Applies up to 4, 8, or 12 LoRAs in one node, with optional strength normalization. |
 | [LoRA List Directory](#lora-list-directory) | Lists the LoRA files in a folder plus a count — a companion to index-based loading. |
 | [LoRA Scale & Save](#lora-scale-save) | Bakes a strength change into a LoRA (via alpha or weights) and saves it as a new file. |
 | [LoRA Truncate Rank](#lora-truncate-rank) | Shrinks an SVD-extracted LoRA by slicing it to a lower rank — fast, no re-decomposition. |
@@ -76,33 +75,6 @@ the tensor cache and the zero-strength short-circuit.
 If both strengths are `0.0` the inputs pass through untouched with no file
 load. File dates/sizes come from a small server endpoint and are cached in the
 browser, refreshed only when new files appear.
-
-### Multi LoRA Loader x4 / x8 / x12
-
-**Applies up to 4, 8, or 12 LoRAs to a model (and optional CLIP) in one node,
-each with its own strength, with optional normalization to keep the total in
-check.**
-
-Three sizes of the same node. Set a slot to `None` or strength `0` to disable
-it. With `normalize` on, if the absolute strengths of active slots sum past
-1.0 they are scaled down proportionally so they sum to exactly 1.0 — useful to
-prevent over-cooking when stacking many LoRAs. A failing LoRA is skipped and
-the rest still load.
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `model` | MODEL | — | Base model. |
-| `normalize` | BOOLEAN | false | Scale strengths down when their absolute sum exceeds 1.0. |
-| `strength_multiplier` | FLOAT | 1.0 | Global multiplier on every active slot's final strength (`0`–`10`). |
-| `clip` | CLIP | *(optional)* | Optional CLIP to also patch. |
-| `lora_1` … `lora_N` | choice | `None` | LoRA for each slot. |
-| `strength_1` … `strength_N` | FLOAT | 1.0 | Per-slot strength (`-10`–`10`), applied to both model and CLIP. |
-| `debug` | BOOLEAN | false | Print per-LoRA loading and normalization info. |
-
-**Outputs:** `model`, `clip`, `loaded_loras` (a newline list of
-`name @ strength` for everything that loaded).
-
-<!-- TODO: screenshot — Multi LoRA Loader x4 with three active slots and normalize on -->
 
 ### LoRA List Directory
 

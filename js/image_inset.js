@@ -165,9 +165,10 @@ app.registerExtension({
         //  Wired / active detection (mirrors Python's resolver)
         // ----------------------------------------------------------------
 
-        // The active upstream feeding an input, or null. A muted (mode 2) or
-        // bypassed (mode 4) upstream counts as not connected — it yields no
-        // image at run time, so the rect hides and nothing composites for it.
+        // The active upstream feeding an input plus the output slot the wire
+        // leaves from ({ up, slot }), or null. A muted (mode 2) or bypassed
+        // (mode 4) upstream counts as not connected — it yields no image at
+        // run time, so the rect hides and nothing composites for it.
         function activeUpstreamNode(inputName) {
             const input = node.inputs?.find((i) => i.name === inputName);
             if (input?.link == null) return null;
@@ -176,7 +177,7 @@ app.registerExtension({
             const up = app.graph.getNodeById(link.origin_id);
             if (!up) return null;
             if (up.mode === 2 || up.mode === 4) return null;
-            return up;
+            return { up, slot: link.origin_slot };
         }
 
         function baseWired() {
@@ -189,13 +190,17 @@ app.registerExtension({
 
         // Find a preview URL from an upstream node — the standard .imgs array,
         // else any <img> inside a DOM widget (custom nodes like VideoScrubber).
-        function findUpstreamPreviewUrl(upstreamNode) {
+        function findUpstreamPreviewUrl(upstreamNode, originSlot) {
             if (!upstreamNode) return null;
             // 1) Standard ComfyUI preview array.
             if (upstreamNode.imgs?.[0]?.src) return upstreamNode.imgs[0].src;
             // 2) CCN convention: a node exposing a live preview of its own
-            //    output (string URL or { src }). Lets transforming nodes like
-            //    the crop node be previewed without a queue.
+            //    output. Slot-aware hook first — nodes whose outputs carry
+            //    different pixels (crop vs source_image) resolve the preview
+            //    for the exact slot the wire leaves from. Plain ccn_image
+            //    (string URL or { src }) is the single-preview fallback.
+            const forSlot = upstreamNode.ccn_imageForSlot?.(originSlot);
+            if (forSlot) return forSlot;
             const ccn = upstreamNode.ccn_image;
             if (ccn) return typeof ccn === "string" ? ccn : (ccn.src || null);
             // 3) Any <img> inside a DOM widget (custom nodes like VideoScrubber).
@@ -646,8 +651,8 @@ app.registerExtension({
         //   Not wired: the current loaded_image selection.
         function loadBestPreview() {
             if (baseWired()) {
-                const up = activeUpstreamNode("image");
-                const wired = up ? findUpstreamPreviewUrl(up) : null;
+                const src = activeUpstreamNode("image");
+                const wired = src ? findUpstreamPreviewUrl(src.up, src.slot) : null;
                 if (wired) { loadBaseImage(wired, "wired source"); return true; }
                 if (node._ccnLastPreview) {
                     loadBaseImage(node._ccnLastPreview.url, node._ccnLastPreview.source);
@@ -675,8 +680,8 @@ app.registerExtension({
                     embeds[id].url = "";
                     continue;
                 }
-                const up = activeUpstreamNode(`embed${id}`);
-                let url = up ? findUpstreamPreviewUrl(up) : null;
+                const src = activeUpstreamNode(`embed${id}`);
+                let url = src ? findUpstreamPreviewUrl(src.up, src.slot) : null;
                 if (!url && node._ccnLastEmbedPreview[id]) {
                     url = node._ccnLastEmbedPreview[id];
                 }

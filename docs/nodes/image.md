@@ -90,7 +90,9 @@ It can also act as a standalone image loader: when nothing is wired to
 `image`, use **Upload Image** or the `loaded_image` picker to crop a file from
 the input directory. **Load Preview** fetches a backdrop from the wired
 upstream's preview or the last run; the backdrop never changes just because a
-job was queued, so your crop stays put. Crop coordinates are stored as
+job was queued, so your crop stays put. When wired to another CCN node, the
+backdrop reflects the specific output the wire comes from — `source_image`
+yields the uncropped source, `image`/`raw_image` the crop. Crop coordinates are stored as
 normalized 0–1 values and serialize with the workflow.
 
 | Parameter | Type | Default | Description |

@@ -557,7 +557,7 @@ app.registerExtension({
         // Find a preview image URL from an upstream node, checking both
         // the standard .imgs array and any <img> elements inside DOM widgets
         // (custom nodes like VideoScrubber use the latter).
-        function findUpstreamPreviewUrl(upstreamNode) {
+        function findUpstreamPreviewUrl(upstreamNode, originSlot) {
             if (!upstreamNode) return null;
 
             // 1) Standard ComfyUI pattern — node.imgs[]
@@ -566,8 +566,12 @@ app.registerExtension({
             }
 
             // 2) CCN convention: a node exposing a live preview of its own
-            //    output (string URL or { src }). Lets transforming nodes be
-            //    previewed without a queue.
+            //    output. Slot-aware hook first — nodes whose outputs carry
+            //    different pixels (crop vs source_image) resolve the preview
+            //    for the exact slot the wire leaves from. Plain ccn_image
+            //    (string URL or { src }) is the single-preview fallback.
+            const forSlot = upstreamNode.ccn_imageForSlot?.(originSlot);
+            if (forSlot) return forSlot;
             const ccn = upstreamNode.ccn_image;
             if (ccn) return typeof ccn === "string" ? ccn : (ccn.src || null);
 
@@ -585,11 +589,12 @@ app.registerExtension({
             return null;
         }
 
-        // The active node feeding the image input, or null. A link to a muted
-        // (mode 2) or bypassed (mode 4) upstream counts as NOT wired: a disabled
-        // node yields no image at run time, so the node falls back to
-        // loaded_image — and Load Preview should reflect that, not the dead
-        // source's stale preview.
+        // The active node feeding the image input plus the output slot the
+        // wire leaves from ({ up, slot }), or null. A link to a muted (mode 2)
+        // or bypassed (mode 4) upstream counts as NOT wired: a disabled node
+        // yields no image at run time, so the node falls back to loaded_image
+        // — and Load Preview should reflect that, not the dead source's stale
+        // preview.
         function activeUpstreamNode() {
             const input = node.inputs?.find((i) => i.name === "image");
             if (input?.link == null) return null;
@@ -598,7 +603,7 @@ app.registerExtension({
             const up = app.graph.getNodeById(link.origin_id);
             if (!up) return null;
             if (up.mode === 2 || up.mode === 4) return null;  // muted / bypassed
-            return up;
+            return { up, slot: link.origin_slot };
         }
 
         // Is the image input wired to an ACTIVE upstream? Mirrors Python: a
@@ -609,8 +614,8 @@ app.registerExtension({
 
         // Best-effort URL for the active wired upstream's current cached preview.
         function wiredPreviewUrl() {
-            const up = activeUpstreamNode();
-            return up ? findUpstreamPreviewUrl(up) : null;
+            const wired = activeUpstreamNode();
+            return wired ? findUpstreamPreviewUrl(wired.up, wired.slot) : null;
         }
 
         // Load the backdrop for whatever drives the run. Only ever called from
@@ -775,32 +780,46 @@ app.registerExtension({
             origRemoved?.apply(this, arguments);
         };
 
-        // Expose a live preview of THIS node's output (the cropped region) so
-        // downstream CCN nodes can show it without a queue. Computed on read via
-        // an offscreen canvas, so interaction pays nothing; null until a backdrop
+        // Expose live previews of THIS node's outputs so downstream CCN nodes
+        // can show them without a queue. The crop is computed on read via an
+        // offscreen canvas, so interaction pays nothing; null until a backdrop
         // is loaded. try/catch guards a tainted-canvas read so the consumer's
         // search just falls through.
+        function cropDataUrl() {
+            if (!previewImg || !imgW || !imgH) return null;
+            try {
+                const c = getCrop();
+                const sx = Math.round(c.x1 * imgW);
+                const sy = Math.round(c.y1 * imgH);
+                const sw = Math.max(1, Math.round((c.x2 - c.x1) * imgW));
+                const sh = Math.max(1, Math.round((c.y2 - c.y1) * imgH));
+                const off = document.createElement("canvas");
+                off.width = sw;
+                off.height = sh;
+                const octx = off.getContext("2d");
+                octx.drawImage(previewImg, sx, sy, sw, sh, 0, 0, sw, sh);
+                return off.toDataURL("image/png");
+            } catch (err) {
+                console.warn("[CCN CroppedImage] crop preview failed:", err);
+                return null;
+            }
+        }
+
+        // Slot-aware preview: consumers pass the wire's origin slot so
+        // source_image resolves to the uncropped backdrop while the crop
+        // outputs resolve to the crop. Matched by output name, not index,
+        // so slot reordering can't silently break it.
+        node.ccn_imageForSlot = (slot) => {
+            const name = node.outputs?.[slot]?.name;
+            if (name === "source_image") return previewImg?.src ?? null;
+            if (name === "image" || name === "raw_image") return cropDataUrl();
+            return null;
+        };
+
+        // Single-preview fallback for consumers without slot awareness.
         Object.defineProperty(node, "ccn_image", {
             configurable: true,
-            get() {
-                if (!previewImg || !imgW || !imgH) return null;
-                try {
-                    const c = getCrop();
-                    const sx = Math.round(c.x1 * imgW);
-                    const sy = Math.round(c.y1 * imgH);
-                    const sw = Math.max(1, Math.round((c.x2 - c.x1) * imgW));
-                    const sh = Math.max(1, Math.round((c.y2 - c.y1) * imgH));
-                    const off = document.createElement("canvas");
-                    off.width = sw;
-                    off.height = sh;
-                    const octx = off.getContext("2d");
-                    octx.drawImage(previewImg, sx, sy, sw, sh, 0, 0, sw, sh);
-                    return off.toDataURL("image/png");
-                } catch (err) {
-                    console.warn("[CCN CroppedImage] ccn_image getter failed:", err);
-                    return null;
-                }
-            },
+            get: cropDataUrl,
         });
 
         requestAnimationFrame(() => {

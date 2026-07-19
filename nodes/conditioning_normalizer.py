@@ -9,18 +9,18 @@ class ConditioningNormalizer:
     """
     Applies normalization methods to conditioning tensors.
     Inspired by A1111 emphasis normalization techniques.
-    
+
     These normalizations can subtly affect image generation even without
     explicit emphasis weights in your prompt, by changing the distribution
     of values in the conditioning tensor.
     """
-    
+
     CATEGORY = "ComfyCollectorNodes/Conditioning"
-    
+
     NORMALIZATION_METHODS = [
         "none",
         "max_norm",
-        "std_norm", 
+        "std_norm",
         "std_half",
         "zscore",
         "zscore_avg",
@@ -31,8 +31,10 @@ class ConditioningNormalizer:
         "clamp_1",
         "clamp_1.5",
         "clamp_2",
+        "clamp_3",
+        "clamp_4",
     ]
-    
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -50,39 +52,39 @@ class ConditioningNormalizer:
     def normalize(self, conditioning, method, strength):
         if method == "none" or strength == 0:
             return (conditioning,)
-        
+
         out = []
         for cond_tuple in conditioning:
             cond = cond_tuple[0].clone()
             pooled = cond_tuple[1].copy() if len(cond_tuple) > 1 else {}
-            
+
             cond = self._apply_normalization(cond, method, strength)
-            
-            out.append((cond, pooled))
-        
+
+            out.append([cond, pooled])
+
         return (out,)
-    
+
     def _apply_normalization(self, z: torch.Tensor, method: str, strength: float) -> torch.Tensor:
         original = z.clone()
-        
+
         if method == "max_norm":
             # Preserve maximum magnitude
             max_val = z.abs().max()
             if max_val > 0:
                 z = z / max_val
-                
+
         elif method == "std_norm":
             # Normalize by standard deviation
             std = z.std()
             if std > 0:
                 z = z / std
-                
+
         elif method == "std_half":
             # Gentler std normalization
             std = z.std()
             if std > 0:
                 z = z / (std * 2.0)
-                
+
         elif method == "zscore":
             # Full z-score normalization
             mean = z.mean()
@@ -91,7 +93,7 @@ class ConditioningNormalizer:
                 z = (z - mean) / std
             else:
                 z = z - mean
-                
+
         elif method == "zscore_avg":
             # Average of z-score and max normalization
             max_val = z.abs().max()
@@ -101,7 +103,7 @@ class ConditioningNormalizer:
                 z_normed = (z - mean) / std
                 max_normed = z / max_val
                 z = (z_normed + max_normed) / 2.0
-                
+
         elif method == "zscore_half":
             # Gentler z-score normalization
             mean = z.mean()
@@ -110,7 +112,7 @@ class ConditioningNormalizer:
                 z = (z - mean) / (std * 2.0)
             else:
                 z = z - mean
-                
+
         elif method == "slight_z":
             # 20% z-score, 80% max norm
             max_val = z.abs().max()
@@ -120,17 +122,17 @@ class ConditioningNormalizer:
                 z_normed = (z - mean) / std
                 max_normed = z / max_val
                 z = (z_normed + (max_normed * 4.0)) / 5.0
-                
+
         elif method == "mean_restore":
-            # Normalize but restore original mean (like A1111's Original emphasis)
-            original_mean = z.mean()
+            # Center, divide by std, then shift the mean back.  The previous
+            # form (divide by std, then rescale to the old mean) was a
+            # mathematical no-op: for a uniform division the restore factor
+            # is exactly the std, cancelling the normalization entirely.
+            mean = z.mean()
             std = z.std()
             if std > 0:
-                z = z / std
-                new_mean = z.mean()
-                if new_mean != 0:
-                    z = z * (original_mean / new_mean)
-                    
+                z = (z - mean) / std + mean
+
         elif method == "range":
             # Scale to [-1, 1] range
             min_val = z.min()
@@ -138,20 +140,23 @@ class ConditioningNormalizer:
             range_val = max_val - min_val
             if range_val > 0:
                 z = 2 * (z - min_val) / range_val - 1
-                    
+
         elif method == "clamp_1":
-            # Clamp values to [-1, 1]
             z = torch.clamp(z, -1.0, 1.0)
-            
+
         elif method == "clamp_1.5":
-            # Clamp values to [-1.5, 1.5]
             z = torch.clamp(z, -1.5, 1.5)
-            
+
         elif method == "clamp_2":
-            # Clamp values to [-2, 2]
             z = torch.clamp(z, -2.0, 2.0)
-        
+
+        elif method == "clamp_3":
+            z = torch.clamp(z, -3.0, 3.0)
+
+        elif method == "clamp_4":
+            z = torch.clamp(z, -4.0, 4.0)
+
         # Blend with original based on strength
         z = original * (1.0 - strength) + z * strength
-        
+
         return z

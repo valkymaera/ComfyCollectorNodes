@@ -25,7 +25,7 @@ CFG step.
 
 ### [LoRA](lora.md)
 
-Loading LoRAs — by index, sorted/filtered, or many at once — and file tools:
+Loading LoRAs — by index or sorted/filtered — and file tools:
 LoRA Scale & Save, LoRA Truncate Rank, and the LoRA / Safetensors metadata
 inspectors.
 

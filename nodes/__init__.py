@@ -13,7 +13,6 @@ from .conditioning_clamp import ConditioningClamp
 from .conditioning_stats import ConditioningStats
 from .conditioning_utils import ConditioningLerp, ConditioningSubtract, RandomSelect
 from .lora_list_directory import LoraListDirectory
-from .multi_lora_loader import MultiLoraLoader4, MultiLoraLoader8, MultiLoraLoader12
 from .string_concatenate import StringConcatenate
 from .string_merge_unique import StringMergeUnique
 from .string_replacer import StringReplacer
@@ -69,9 +68,6 @@ NODE_CLASS_MAPPINGS = {
     "CCN_ConditioningLerp": ConditioningLerp,
     "CCN_ConditioningSubtract": ConditioningSubtract,
     "CCN_LoraListDirectory": LoraListDirectory,
-    "CCN_MultiLoraLoader4": MultiLoraLoader4,
-    "CCN_MultiLoraLoader8": MultiLoraLoader8,
-    "CCN_MultiLoraLoader12": MultiLoraLoader12,
     "CCN_StringConcatenate": StringConcatenate,
     "CCN_StringMergeUnique": StringMergeUnique,
     "CCN_StringReplacer": StringReplacer,
@@ -150,9 +146,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_ConditioningLerp": "Conditioning Lerp (CCN)",
     "CCN_ConditioningSubtract": "Conditioning Subtract (CCN)",
     "CCN_LoraListDirectory": "LoRA List Directory (CCN)",
-    "CCN_MultiLoraLoader4": "Multi LoRA Loader x4 (CCN)",
-    "CCN_MultiLoraLoader8": "Multi LoRA Loader x8 (CCN)",
-    "CCN_MultiLoraLoader12": "Multi LoRA Loader x12 (CCN)",
     "CCN_StringConcatenate": "String Concatenate (CCN)",
     "CCN_StringMergeUnique": "String Merge Unique (CCN)",
     "CCN_StringReplacer": "String Replacer (CCN)",
