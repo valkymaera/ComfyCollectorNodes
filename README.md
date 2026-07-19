@@ -89,7 +89,7 @@ and append it minus anything that already exists. And append simply adds it to w
 The storage is per session, not per workflow, so you can retrieve it across many workflows until comfy is restarted or you clear it yourself.
 
 At any time you can access any category you stored by using a PromptStoreGet node.
-If you want to load all the categories you stored for a store name, you can just use an empty prompt store node's outpout, with the appropriate name (just don't set it to clear).
+If you want to load all the categories you stored for a store name, you can just use an empty prompt store node's output, with the appropriate name (just don't set it to clear).
 
 There is a simpler variant called "PromptBuilder" that does not store anything to memory, just provides an easy way to block out prompts into categories.
 
