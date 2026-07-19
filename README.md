@@ -84,6 +84,8 @@ So if you have a store named "action_shots" and you set the mood category to "da
 If the mode is set to override, then putting something else in the mood category will overwrite it. If it's set to merge, then it will split your input at the separator (comma by default), 
 and append it minus anything that already exists. And append simply adds it to what exists.
 
+<img width="1747" height="1158" alt="image" src="https://github.com/user-attachments/assets/3fb859d3-76ab-4bca-bb56-45ed97cdcdd8" />
+
 The storage is per session, not per workflow, so you can retrieve it across many workflows until comfy is restarted or you clear it yourself.
 
 At any time you can access any category you stored by using a PromptStoreGet node.
