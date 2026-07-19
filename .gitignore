@@ -225,3 +225,6 @@ __marimo__/
 
 # Runtime state
 wip/.ccn_gated_state.json
+
+# Local-only nodes (never committed)
+local/
