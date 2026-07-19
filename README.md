@@ -2,6 +2,9 @@
 
 A set of nodes I needed and that you can also have, too, as well.
 
+Most of these nodes are tinker-related; normalization, scaling, latent channel adjustment, some custom loaders with QoL features.
+There are a few that hit a good niche I think was missing, and I've detailed a few of those below.
+
 **📖 Full documentation: [valkymaera.github.io/ComfyCollectorNodes](https://valkymaera.github.io/ComfyCollectorNodes/)**
 
 All nodes appear in the ComfyUI menu with a `(CCN)` suffix.
@@ -81,6 +84,8 @@ So if you have a store named "action_shots" and you set the mood category to "da
 If the mode is set to override, then putting something else in the mood category will overwrite it. If it's set to merge, then it will split your input at the separator (comma by default), 
 and append it minus anything that already exists. And append simply adds it to what exists.
 
+<img width="1747" height="1158" alt="image" src="https://github.com/user-attachments/assets/3fb859d3-76ab-4bca-bb56-45ed97cdcdd8" />
+
 The storage is per session, not per workflow, so you can retrieve it across many workflows until comfy is restarted or you clear it yourself.
 
 At any time you can access any category you stored by using a PromptStoreGet node.
@@ -103,7 +108,7 @@ The last is a curve-integrated CFG guider to use with custom samplers. Each has 
 # Special Condition Tinkering
 
 ## Neutral Prompt Nodes
-This project is a conceptual port of the "Neutral Prompt" mechanism from Ijleb under the MIT License: https://github.com/ljleb/sd-webui-neutral-prompt which I used a ton in Automatic1111.
+These nodes are a conceptual port of the "Neutral Prompt" mechanism from Ijleb under the MIT License: https://github.com/ljleb/sd-webui-neutral-prompt which I used a ton in Automatic1111.
 The nodes are model agnostic but some will respond better than others at various weights.
 
 This allows powerful orthagonal prompt/conditioning combination instead of a basic merge. 
