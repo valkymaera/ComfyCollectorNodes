@@ -122,23 +122,20 @@ will vary depending on the model. It is primarily used as an experimenting surfa
 Note that except for string replacement, all of these require re-encoding conditioning in multiple passes. For most things this is pretty fast, but for some vision-encoding models this may add 
 noticeable seconds to your workflow execution time.
 
+All the entries in the hyper-remap are separated by semicolons or newlines, and there are some per-entry means of controling the blend strength, threshold, and sharpness, including intrinsic values for delta remapping, described in the [actual documentation](https://valkymaera.github.io/ComfyCollectorNodes/nodes/conditioning/#hyper-remap).
+
 ### String replace
-The first, simplest use is string replace. Comma separated values swap the first value with the second in the prompt directly. "red, blue" replaces "red" with "blue". This one is consistent across models, naturally.
+The first, simplest use is string replace. Comma separated values swap the first value with the second in the prompt directly. "red, blue" replaces "red" with "blue". Note this is plain substring replacement, so partial words match too ("red, blue" will happily turn "hatred" into "hatblue"). A case sensitivity toggle is available for this phase. This one is consistent across models, naturally.
 
 ### Token Remap 
-Weighted token remapping uses arrow pairs (source -> target) to encode the prompt twice and blend embeddings at changed positions. The text is NOT modified — this is embedding-space only.
-This lets you blend partway between red and blue in the remap, rather than entirely swap one word out for the other. Because it is token-based rather than word-based, some use cases may not have 
-the intended effect, and some models or CLIP formats may be resilient.
+Weighted token remapping uses arrow pairs (source -> target) to blend embeddings at the changed positions. The prompt is encoded once as written, then once more per remap pair with the swap applied, and the results are blended in embedding space. The text itself is NOT modified. This lets you land partway between red and blue rather than swapping one word out entirely. Unlike string replace, this matches whole words only. Because it operates on tokens rather than words, some use cases may not have the intended effect, and some models or CLIP formats may be resilient to it.
 
 ### Concept Remap
-fat-arrow pairs (source => target) nudge the conditioning along concept-direction vectors.  Position weights are derived from cosine similarity between each incoming conditioning position and the source concept vector.
-As a differential remap of the concept rather than individual tokens, this remapping can effect related and adjacent elements in the scene along the vector, like lighting or palette or composition and setting details.
+Fat-arrow pairs (source => target) nudge the conditioning along a concept direction (the vector from the source concept toward the target concept). To figure out where to apply that nudge, the node works in one of two ways. If the source word actually appears in your prompt, it measures the influence directly: the prompt is encoded with and without the word, and wherever the encoding changed, that's where the concept lives, including all the contextual bleed from attention, like reflections, lighting, or palette. If the source word isn't in your prompt, it falls back to an approximation, using similarity between each position of the conditioning and the source concept. That fallback is looser, but it means you can remap concepts that are only implied, like shifting "gloomy => cheerful" on a prompt that never says gloomy. Either way, because this remaps the concept rather than individual tokens, it can affect related and adjacent elements of the scene along the way, like mood, composition, and setting details.
 
 ### Delta Remap
-Two tildes specify a special delta remap as A\~\~B. This takes two arbitrary prompts A and B on either side of the tildes, which don't have to be related to the main prompt, 
-encodes them both and determines the vector difference as A without B. It then adds that delta into your prompt's conditioning to give it a nudge in that abstract direction. 
-For example, you could use "beach\~\~bright tropical summer" to get the differential vector between a beach and a tropical summer, and add that to the outbound conditioning. 
-This aspect is highly experimental. The original purpose was to experiment with bringing out details that a model may have knowledge of without being given token data for.
+Two tildes specify a special delta remap as A\~\~B. This takes two arbitrary prompts A and B on either side of the tildes (they don't have to be related to your main prompt at all). Both are encoded, and their difference becomes a delta: roughly, "A without B". That delta is then added into your prompt's conditioning to nudge it in that abstract direction. For example, "beach\~\~bright tropical summer" produces the beach-ness left over once the bright tropical summer component is stripped out, and adds that to the outbound conditioning.
+The delta isn't dumped in uniformly. By default it's normalized so the blend strength behaves consistently no matter how different A and B are, and it's weighted two ways: toward the positions where A and B differ most (so the nudge focuses on what actually distinguishes them), and toward the parts of your prompt's conditioning that relate to A (so it lands where it's relevant). The sharpness and threshold controls govern that second layer; the first has its own per-pair overrides if you want to tune or disable it. This aspect is highly experimental. The original purpose was to experiment with bringing out details that a model may have knowledge of without being given token data for.
 
 For example, imagine a model that was never trained on flowers and plants or any words related to flowers and plants, but it was trained on many images of bees in the wild.
 We know that the flowers themselves do exist in the data, just in the context of photos of bees only, not appropriately labeled as plants.
