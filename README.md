@@ -9,7 +9,7 @@ There are a few that hit a good niche I think was missing, and I've detailed a f
 
 All nodes appear in the ComfyUI menu with a `(CCN)` suffix.
 
-## What's inside
+## Core Categories
 
 - **[Conditioning](https://valkymaera.github.io/ComfyCollectorNodes/nodes/conditioning/)** — edit prompts in embedding space: Token/Concept/Hyper Remap for blending words toward other meanings, Projection Removal as a negative tinker node for flow models, plus scale/normalize/clamp/lerp/subtract and inspection tools.
 - **[Sampling & Guidance](https://valkymaera.github.io/ComfyCollectorNodes/nodes/sampling/)** — a visual curve editor driving CFG across sampling steps (Curve CFG Guider), CFG-Zero* Scaled, and the Neutral Prompt family for merging auxiliary prompts without fighting the main one.
