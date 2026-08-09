@@ -375,7 +375,6 @@ def _cache_dir():
 def _cache_filename(video, frame_idx):
     """
     Build a human-readable, sortable cache filename for one frame.
-
     The video stem is reduced to ASCII word characters, keeping the names
     tidy, sortable, and safe in /view URLs regardless of the source name.
     Two source names that normalize identically would collide, which is
