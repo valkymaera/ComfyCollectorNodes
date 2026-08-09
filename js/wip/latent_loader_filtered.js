@@ -1,5 +1,5 @@
-import { app } from "../../scripts/app.js";
-import { api } from "../../scripts/api.js";
+import { app } from "../../../scripts/app.js";
+import { api } from "../../../scripts/api.js";
 
 // name -> {mtime, size}, fetched lazily. Refetched only when the combo holds a
 // name we haven't seen (i.e. new latents appeared after a ComfyUI refresh).
