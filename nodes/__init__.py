@@ -52,8 +52,11 @@ from .curve_to_core import CurveToCore
 from .cfg_zero_star_scaled import CFGZeroStarScaled
 from .cropped_image import CroppedImage
 from .image_inset import ImageInset
+from .rotate_image import RotateImage
 from .hyper_remap_krea2edit import HyperRemapKrea2Edit
 from .hyper_remap_krea2edit_slim import HyperRemapKrea2EditSlim
+from .lora_multi_loader import LoraMultiLoader
+from .gate_any import GateAny
 
 NODE_CLASS_MAPPINGS = {
     "CCN_LoraLoaderByIndex": LoraLoaderByIndex,
@@ -129,8 +132,11 @@ NODE_CLASS_MAPPINGS = {
     "CCN_CFGZeroStarScaled": CFGZeroStarScaled,
     "CCN_CroppedImage": CroppedImage,
     "CCN_ImageInset": ImageInset,
+    "CCN_RotateImage": RotateImage,
     "CCN_HyperRemapKrea2Edit": HyperRemapKrea2Edit,
     "CCN_HyperRemapKrea2EditSlim": HyperRemapKrea2EditSlim,
+    "CCN_LoraMultiLoader": LoraMultiLoader,
+    "CCN_GateAny": GateAny,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -207,6 +213,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_CFGZeroStarScaled": "CFG-Zero* Scaled (CCN)",
     "CCN_CroppedImage": "Cropped Image (CCN)",
     "CCN_ImageInset": "Image Inset (CCN)",
+    "CCN_RotateImage": "Rotate Image (CCN)",
     "CCN_HyperRemapKrea2Edit": "Hyper Remap Krea2 Edit (CCN)",
     "CCN_HyperRemapKrea2EditSlim": "Hyper Remap Krea2 Edit Slim (CCN)",
+    "CCN_LoraMultiLoader": "LoRA Multi Loader (CCN)",
+    "CCN_GateAny": "Gate Any (CCN)",
 }

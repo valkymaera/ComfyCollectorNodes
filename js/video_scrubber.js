@@ -16,6 +16,8 @@ app.registerExtension({
         let lastFilename = "";
         let debounceTimer = null;
         let blobUrl = null;
+        let fetchInFlight = false;
+        let queuedFetch = null;
 
         function releaseBlobUrl() {
             if (blobUrl) {
@@ -142,19 +144,41 @@ app.registerExtension({
 
         async function fetchFrame(filename, idx) {
             if (!filename) return;
+            // Latest-wins coalescing: server-side decode can take longer than
+            // the scrub interval, so keep at most one request in flight and
+            // remember only the newest frame asked for while it runs — the
+            // preview jumps straight there instead of replaying every
+            // intermediate position.
+            if (fetchInFlight) {
+                queuedFetch = { filename, idx };
+                return;
+            }
+            fetchInFlight = true;
             try {
                 const url =
                     `/ccn/video_scrubber/frame` +
                     `?filename=${encodeURIComponent(filename)}` +
                     `&frame=${idx}`;
                 const resp = await api.fetchApi(url);
-                if (!resp.ok) return;
+                if (!resp.ok) {
+                    console.warn(
+                        "[CCN VideoScrubber] frame fetch failed:", resp.status
+                    );
+                    return;
+                }
                 releaseBlobUrl();
                 const blob = await resp.blob();
                 blobUrl = URL.createObjectURL(blob);
                 previewImg.src = blobUrl;
             } catch (e) {
                 console.error("[CCN VideoScrubber] frame fetch:", e);
+            } finally {
+                fetchInFlight = false;
+                if (queuedFetch) {
+                    const next = queuedFetch;
+                    queuedFetch = null;
+                    fetchFrame(next.filename, next.idx);
+                }
             }
         }
 
@@ -182,7 +206,12 @@ app.registerExtension({
                     `/ccn/video_scrubber/info` +
                     `?filename=${encodeURIComponent(filename)}`;
                 const resp = await api.fetchApi(url);
-                if (!resp.ok) return;
+                if (!resp.ok) {
+                    console.warn(
+                        "[CCN VideoScrubber] info fetch failed:", resp.status
+                    );
+                    return;
+                }
 
                 const info = await resp.json();
                 totalFrames = info.total_frames || 0;
@@ -316,6 +345,7 @@ app.registerExtension({
                         "[CCN VideoScrubber] upload failed:",
                         resp.status, detail
                     );
+                    label.textContent = `Upload failed (${resp.status})`;
                     uploadBtn.textContent = "Upload failed";
                     setTimeout(() => {
                         uploadBtn.textContent = "Upload Video";
@@ -323,6 +353,7 @@ app.registerExtension({
                 }
             } catch (e) {
                 console.error("[CCN VideoScrubber] upload:", e);
+                label.textContent = "Upload failed";
                 uploadBtn.textContent = "Upload failed";
                 setTimeout(() => {
                     uploadBtn.textContent = "Upload Video";
