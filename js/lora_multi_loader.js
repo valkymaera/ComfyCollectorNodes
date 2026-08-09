@@ -1,50 +1,22 @@
-// LoRA Pair Loader (CCN) -- dynamic row widget.
+// LoRA Multi Loader (CCN) -- dynamic row widget with trigger-word chips.
 //
 // Rows serialize as widget values named "lora_<n>":
-//   { on: bool, lora: string, strength_high: float, strength_low: float }
-// The Python side (lora_pair_loader.py) harvests them from **kwargs and is
-// authoritative for pair resolution; the badge here is a preview only.
-// The pair-token table is mirrored from the Python file; keep in sync.
+//   { on: bool, lora: string, strength: float, id: int }
+// The Python side (lora_multi_loader.py) harvests them from **kwargs.
+// Trigger chips are display-only and never serialized; they come from
+// POST /ccn/lora_triggers on pick, on workflow configure, and via the
+// Refresh Triggers button (which bypasses the cache).
 
-import { app } from "../../../scripts/app.js";
-import { api } from "../../../scripts/api.js";
+import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 
-const NODE_NAME = "CCN_LoraPairLoader";
-const ROW_TYPE = "CCN_LORA_PAIR_ROW";
+const NODE_NAME = "CCN_LoraMultiLoader";
+const ROW_TYPE = "CCN_LORA_ROW";
 const STRENGTH_MIN = -10.0;
 const STRENGTH_MAX = 10.0;
 const DRAG_SCALE = 0.01; // strength units per pixel
 const CLICK_TOLERANCE = 3; // px of movement still treated as a click
-
-const PAIR_TOKENS = [
-  ["high_noise", "low_noise"],
-  ["high-noise", "low-noise"],
-  ["high noise", "low noise"],
-  ["highnoise", "lownoise"],
-  ["_high", "_low"],
-  ["-high", "-low"],
-  [".high", ".low"],
-  [" high", " low"],
-  ["high_", "low_"],
-  ["high-", "low-"],
-  ["high.", "low."],
-  ["high ", "low "],
-  ["high/", "low/"],
-  ["high\\", "low\\"],
-  ["/high", "/low"],
-  ["\\high", "\\low"],
-];
-
-// Single-letter (h/l) and abbreviated (hn/ln) markers across the delimiter
-// product, matching the generated table in lora_pair_loader.py.
-const ABBREV_DELIMS = ["_", "-", ".", " ", "/", "\\"];
-for (const [abbrevHigh, abbrevLow] of [["hn", "ln"], ["h", "l"]]) {
-  for (const left of ABBREV_DELIMS) {
-    for (const right of ABBREV_DELIMS) {
-      PAIR_TOKENS.push([`${left}${abbrevHigh}${right}`, `${left}${abbrevLow}${right}`]);
-    }
-  }
-}
+const CHIP_LINE_H = 16; // extra row height when trigger chips are shown
 
 let loraListCache = null;
 
@@ -57,7 +29,7 @@ async function fetchLoraList() {
       loraListCache = list;
     }
   } catch (err) {
-    console.warn("[CCN LoraPairLoader] failed to fetch lora list", err);
+    console.warn("[CCN LoraMultiLoader] failed to fetch lora list", err);
   }
   return loraListCache ?? [];
 }
@@ -65,27 +37,27 @@ async function fetchLoraList() {
 let loraEntriesCache = null; // [{ name, mtime|null }]
 let chooserSortMode = "name"; // "name" | "date"
 try {
-  chooserSortMode = localStorage.getItem("ccn.lorapair.sort") || "name";
+  chooserSortMode = localStorage.getItem("ccn.loramulti.sort") || "name";
 } catch (_) { /* storage unavailable */ }
 
 function setSortMode(mode) {
   chooserSortMode = mode;
-  try { localStorage.setItem("ccn.lorapair.sort", mode); } catch (_) {}
+  try { localStorage.setItem("ccn.loramulti.sort", mode); } catch (_) {}
 }
 
 async function fetchLoraEntries() {
   try {
-    const res = await api.fetchApi("/ccn/loras");
+    const res = await api.fetchApi("/ccn/lora_filter/list");
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.every((e) => typeof e?.name === "string")) {
-        loraEntriesCache = data;
-        loraListCache = data.map((e) => e.name); // keeps the pair badge fed
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        loraEntriesCache = Object.entries(data).map(
+          ([name, m]) => ({ name, mtime: m?.mtime || null }));
         return loraEntriesCache;
       }
     }
   } catch (err) {
-    console.warn("[CCN LoraPairLoader] /ccn/loras unavailable, using name-only list", err);
+    console.warn("[CCN LoraMultiLoader] /ccn/lora_filter/list unavailable, using name-only list", err);
   }
   const names = await fetchLoraList();
   loraEntriesCache = names.map((n) => ({ name: n, mtime: null }));
@@ -141,7 +113,7 @@ function openLoraChooser(event, onPick) {
   bar.style.cssText = "display:flex;gap:4px;padding:6px;flex:0 0 auto;";
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "search\u2026";
+  input.placeholder = "search…";
   input.style.cssText =
     "flex:1;background:#14141e;border:1px solid #444;border-radius:3px;" +
     "color:#ddd;padding:4px 6px;font:12px monospace;outline:none;";
@@ -229,7 +201,7 @@ function openLoraChooser(event, onPick) {
     if (visible.length > CHOOSER_MAX_ITEMS) {
       const more = document.createElement("div");
       more.textContent =
-        `\u2026 ${visible.length - CHOOSER_MAX_ITEMS} more \u2014 refine the search`;
+        `… ${visible.length - CHOOSER_MAX_ITEMS} more — refine the search`;
       more.style.cssText = "padding:4px 8px;color:#777;font-size:10px;";
       frag.appendChild(more);
     }
@@ -288,22 +260,47 @@ function openLoraChooser(event, onPick) {
   });
 }
 
-function hasPartner(loraName) {
-  if (!loraListCache || !loraName || loraName === "None") return false;
-  const lowerSet = new Set(loraListCache.map((n) => n.toLowerCase()));
-  const lower = loraName.toLowerCase();
-  const search = "/" + lower; // string-start sentinel, mirrors the Python side
-  for (const [hi, lo] of PAIR_TOKENS) {
-    for (const [src, dst] of [[hi, lo], [lo, hi]]) {
-      let idx = search.indexOf(src);
-      while (idx !== -1) {
-        const candidate = (search.slice(0, idx) + dst + search.slice(idx + src.length)).slice(1);
-        if (candidate !== lower && lowerSet.has(candidate)) return true;
-        idx = search.indexOf(src, idx + 1);
-      }
+const triggerCache = new Map(); // lora name -> string[] ([] = known none)
+
+async function fetchTriggers(names, { force = false } = {}) {
+  const wanted = [...new Set(
+    names.filter((n) => n && n !== "None" && (force || !triggerCache.has(n))))];
+  if (!wanted.length) return;
+  try {
+    const res = await api.fetchApi("/ccn/lora_triggers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names: wanted }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    for (const n of wanted) {
+      triggerCache.set(n, Array.isArray(data?.[n]) ? data[n] : []);
     }
+  } catch (err) {
+    console.warn("[CCN LoraMultiLoader] trigger fetch failed", err);
   }
-  return false;
+}
+
+function rowTriggers(row) {
+  const name = row.value.lora;
+  if (!name || name === "None") return null;
+  const t = triggerCache.get(name);
+  return t?.length ? t : null;
+}
+
+function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback for non-secure contexts (plain-http LAN).
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand("copy");
+  ta.remove();
+  return Promise.resolve();
 }
 
 function baseName(path) {
@@ -324,35 +321,15 @@ function rowWidgets(node) {
   return node.widgets ? node.widgets.filter((w) => w.type === ROW_TYPE) : [];
 }
 
-function rowSuffix(row) {
-  const i = row.name.indexOf("_");
-  return i === -1 ? row.name : row.name.slice(i + 1);
+function rowLoraNames(node) {
+  return rowWidgets(node).map((r) => r.value.lora);
 }
 
-function curveSocketName(row) {
-  return `curve_${rowSuffix(row)}`;
-}
-
-function ensureCurveSocket(node, row) {
-  const name = curveSocketName(row);
-  if (!node.inputs?.some((inp) => inp.name === name)) {
-    node.addInput(name, "CCN_CURVE");
-    node.setSize(node.computeSize());
-  }
-}
-
-function removeCurveSocket(node, row) {
-  const name = curveSocketName(row);
-  const idx = node.inputs?.findIndex((inp) => inp.name === name);
-  if (idx != null && idx >= 0) {
-    node.removeInput(idx);
-    node.setSize(node.computeSize());
-  }
-}
-
-function curveConnected(node, row) {
-  return node.inputs?.some(
-    (inp) => inp.name === curveSocketName(row) && inp.link != null);
+// Re-fit height after row heights change, preserving user-set width.
+function resizeRows(node) {
+  const computed = node.computeSize();
+  node.setSize([Math.max(node.size[0], computed[0]), computed[1]]);
+  node.setDirtyCanvas(true, true);
 }
 
 function makeRow(node, value) {
@@ -364,34 +341,38 @@ function makeRow(node, value) {
     name: `lora_${id}`,
     value: {
       on: true,
-      mode: "static",
       lora: "None",
-      strength_high: 1.0,
-      strength_low: 1.0,
+      strength: 1.0,
       ...(value ?? {}),
       id,
     },
     _hit: {},
     _drag: null,
+    _copied: null,
 
     computeSize(width) {
-      return [width ?? 200, LiteGraph.NODE_WIDGET_HEIGHT];
+      const base = LiteGraph.NODE_WIDGET_HEIGHT;
+      return [width ?? 200, rowTriggers(this) ? base + CHIP_LINE_H : base];
     },
 
     serializeValue() {
-      return this.value;
+      const { on, lora, strength, id: rowId } = this.value;
+      return { on, lora, strength, id: rowId };
     },
 
     draw(ctx, drawNode, width, y, height) {
       const margin = 12;
-      const midY = y + height / 2;
+      const lineH = LiteGraph.NODE_WIDGET_HEIGHT;
+      const chips = rowTriggers(this);
+      const totalH = lineH + (chips ? CHIP_LINE_H : 0);
+      const midY = y + lineH / 2;
       const on = !!this.value.on;
       ctx.save();
 
       ctx.fillStyle = LiteGraph.WIDGET_BGCOLOR;
       ctx.strokeStyle = LiteGraph.WIDGET_OUTLINE_COLOR;
       ctx.beginPath();
-      ctx.roundRect(margin, y + 1, width - margin * 2, height - 2, height * 0.3);
+      ctx.roundRect(margin, y + 1, width - margin * 2, totalH - 2, lineH * 0.3);
       ctx.fill();
       ctx.stroke();
 
@@ -402,20 +383,7 @@ function makeRow(node, value) {
       ctx.arc(toggleX, midY, 4.5, 0, Math.PI * 2);
       ctx.fill();
       this._hit.toggle = [margin, margin + 22];
-
-      // Mode chip: [B]aked patches the models, [L]ane feeds lora_lanes.
-      const isLane = this.value.mode === "lane";
-      const chipX0 = margin + 24, chipX1 = chipX0 + 16;
-      ctx.fillStyle = isLane ? "#7060c0" : "#3a3a4a";
-      ctx.beginPath();
-      ctx.roundRect(chipX0, y + 4, chipX1 - chipX0, height - 8, 3);
-      ctx.fill();
-      ctx.fillStyle = on ? "#ddd" : "#888";
-      ctx.font = "9px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(isLane ? "L" : "B", (chipX0 + chipX1) / 2, midY);
-      this._hit.mode = [chipX0 - 2, chipX1 + 2];
+      this._hit.line1 = [y, y + lineH];
 
       // Remove [x] at far right.
       const removeX1 = width - margin - 4;
@@ -424,42 +392,29 @@ function makeRow(node, value) {
       ctx.font = "11px Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("\u2715", (removeX0 + removeX1) / 2, midY);
+      ctx.fillText("✕", (removeX0 + removeX1) / 2, midY);
       this._hit.remove = [removeX0 - 2, removeX1 + 2];
 
-      // Strength fields, right-aligned before the remove button.
+      // Strength field, right-aligned before the remove button.
       ctx.font = "12px Arial";
       const fieldW = 52;
-      const lowX1 = removeX0 - 6;
-      const lowX0 = lowX1 - fieldW;
-      const highX1 = lowX0 - 4;
-      const highX0 = highX1 - fieldW;
+      const strengthX1 = removeX0 - 6;
+      const strengthX0 = strengthX1 - fieldW;
       const textColor = on
         ? LiteGraph.WIDGET_TEXT_COLOR
         : LiteGraph.WIDGET_SECONDARY_TEXT_COLOR;
 
       ctx.textAlign = "left";
-      ctx.fillStyle = LiteGraph.WIDGET_SECONDARY_TEXT_COLOR;
-      ctx.fillText("H", highX0, midY);
       ctx.fillStyle = textColor;
-      ctx.fillText(this.value.strength_high.toFixed(2), highX0 + 12, midY);
-      ctx.fillStyle = LiteGraph.WIDGET_SECONDARY_TEXT_COLOR;
-      ctx.fillText("L", lowX0, midY);
-      ctx.fillStyle = textColor;
-      ctx.fillText(this.value.strength_low.toFixed(2), lowX0 + 12, midY);
-      this._hit.high = [highX0 - 2, highX1];
-      this._hit.low = [lowX0 - 2, lowX1];
+      ctx.fillText(this.value.strength.toFixed(2), strengthX0 + 8, midY);
+      this._hit.strength = [strengthX0 - 2, strengthX1];
 
-      // Name + pair badge fill the remaining middle.
-      const nameX0 = margin + 46;
-      const nameX1 = highX0 - 8;
-      let display = this.value.lora === "None" ? "click to choose\u2026" : baseName(this.value.lora);
-      if (this.value.lora !== "None" && hasPartner(this.value.lora)) {
-        display = "\u21c4 " + display; // pair badge
-      }
-      if (isLane && curveConnected(drawNode, this)) {
-        display = "~ " + display; // curve attached
-      }
+      // Name fills the remaining middle.
+      const nameX0 = margin + 24;
+      const nameX1 = strengthX0 - 8;
+      let display = this.value.lora === "None"
+        ? "click to choose…"
+        : baseName(this.value.lora);
       ctx.fillStyle = this.value.lora === "None"
         ? LiteGraph.WIDGET_SECONDARY_TEXT_COLOR
         : textColor;
@@ -470,40 +425,77 @@ function makeRow(node, value) {
       ctx.fillText(display, nameX0, midY);
       this._hit.name = [nameX0 - 4, nameX1];
 
+      // Trigger chips on the second line, click to copy.
+      this._hit.chips = [];
+      if (chips) {
+        const chipY0 = y + lineH - 1;
+        const chipH = CHIP_LINE_H - 4;
+        const maxX = width - margin - 6;
+        ctx.font = "9px monospace";
+        let cxp = nameX0;
+        for (const word of chips) {
+          let label = word;
+          let tw = ctx.measureText(label).width;
+          while (label.length > 4 && cxp + tw + 10 > maxX) {
+            label = label.slice(0, -2) + "…";
+            tw = ctx.measureText(label).width;
+          }
+          if (cxp + tw + 10 > maxX) break;
+          const chipW = tw + 10;
+          const copied = this._copied?.word === word &&
+            Date.now() < this._copied.until;
+          ctx.fillStyle = copied ? "#3d6b3d" : "#33334a";
+          ctx.beginPath();
+          ctx.roundRect(cxp, chipY0, chipW, chipH, 3);
+          ctx.fill();
+          ctx.fillStyle = copied ? "#cfc" : on ? "#aab" : "#777";
+          ctx.fillText(label, cxp + 5, chipY0 + chipH / 2 + 0.5);
+          this._hit.chips.push(
+            { x0: cxp, x1: cxp + chipW, y0: chipY0, y1: chipY0 + chipH, word });
+          cxp += chipW + 4;
+        }
+      }
+
       ctx.restore();
     },
 
     mouse(event, pos, mouseNode) {
       const x = pos[0];
+      const yy = pos[1];
       const type = event.type;
       const inZone = (zone) => zone && x >= zone[0] && x <= zone[1];
+      const line1 = this._hit.line1;
+      const inLine1 = !line1 || (yy >= line1[0] && yy <= line1[1]);
 
       if (type === "pointerdown" || type === "mousedown") {
+        if (!inLine1) {
+          const chip = (this._hit.chips ?? []).find(
+            (c) => x >= c.x0 && x <= c.x1 && yy >= c.y0 && yy <= c.y1);
+          if (chip) {
+            copyText(chip.word).then(() => {
+              this._copied = { word: chip.word, until: Date.now() + 800 };
+              mouseNode.setDirtyCanvas(true, true);
+              setTimeout(() => mouseNode.setDirtyCanvas(true, true), 850);
+            });
+            return true;
+          }
+          return false;
+        }
         if (inZone(this._hit.toggle)) {
           this.value.on = !this.value.on;
-          mouseNode.setDirtyCanvas(true, true);
-          return true;
-        }
-        if (inZone(this._hit.mode)) {
-          this.value.mode = this.value.mode === "lane" ? "static" : "lane";
-          if (this.value.mode === "lane") ensureCurveSocket(mouseNode, this);
-          else removeCurveSocket(mouseNode, this);
           mouseNode.setDirtyCanvas(true, true);
           return true;
         }
         if (inZone(this._hit.remove)) {
           const idx = mouseNode.widgets.indexOf(this);
           if (idx !== -1) {
-            removeCurveSocket(mouseNode, this);
             mouseNode.widgets.splice(idx, 1);
-            mouseNode.setSize(mouseNode.computeSize());
-            mouseNode.setDirtyCanvas(true, true);
+            resizeRows(mouseNode);
           }
           return true;
         }
-        if (inZone(this._hit.high) || inZone(this._hit.low)) {
-          const field = inZone(this._hit.high) ? "strength_high" : "strength_low";
-          this._drag = { field, startX: x, startValue: this.value[field], moved: false };
+        if (inZone(this._hit.strength)) {
+          this._drag = { startX: x, startValue: this.value.strength, moved: false };
           return true;
         }
         if (inZone(this._hit.name)) {
@@ -518,7 +510,7 @@ function makeRow(node, value) {
         const delta = x - this._drag.startX;
         if (Math.abs(delta) > CLICK_TOLERANCE) this._drag.moved = true;
         if (this._drag.moved) {
-          this.value[this._drag.field] = clampStrength(this._drag.startValue + delta * DRAG_SCALE);
+          this.value.strength = clampStrength(this._drag.startValue + delta * DRAG_SCALE);
           mouseNode.setDirtyCanvas(true, true);
         }
         return true;
@@ -529,14 +521,13 @@ function makeRow(node, value) {
         this._drag = null;
         if (!drag.moved) {
           // Treat as a click: type an exact value.
-          const current = this.value[drag.field];
           app.canvas.prompt(
-            drag.field === "strength_high" ? "High strength" : "Low strength",
-            current,
+            "Strength",
+            this.value.strength,
             (v) => {
               const parsed = parseFloat(v);
               if (Number.isFinite(parsed)) {
-                this.value[drag.field] = clampStrength(parsed);
+                this.value.strength = clampStrength(parsed);
                 mouseNode.setDirtyCanvas(true, true);
               }
             },
@@ -552,7 +543,8 @@ function makeRow(node, value) {
     _openChooser(event, chooserNode) {
       openLoraChooser(event, (v) => {
         this.value.lora = v;
-        chooserNode.setDirtyCanvas(true, true);
+        resizeRows(chooserNode);
+        fetchTriggers([v]).then(() => resizeRows(chooserNode));
       });
     },
   };
@@ -567,7 +559,7 @@ function addRow(node, value) {
   } else {
     node.widgets.splice(buttonIndex, 0, row);
   }
-  node.setSize(node.computeSize());
+  resizeRows(node);
   return row;
 }
 
@@ -582,11 +574,11 @@ function ensureRowCount(node, count) {
     node.widgets.splice(idx, 1);
     rows = rowWidgets(node);
   }
-  node.setSize(node.computeSize());
+  resizeRows(node);
 }
 
 app.registerExtension({
-  name: "CCN.LoraPairLoader",
+  name: "CCN.LoraMultiLoader",
 
   async beforeRegisterNodeDef(nodeType, nodeData) {
     if (nodeData.name !== NODE_NAME) return;
@@ -599,7 +591,7 @@ app.registerExtension({
 
       this._ccnAddButton = this.addWidget(
         "button",
-        "\uFF0B Add LoRA",
+        "＋ Add LoRA",
         null,
         () => {
           addRow(this);
@@ -609,8 +601,20 @@ app.registerExtension({
       this._ccnAddButton.options = this._ccnAddButton.options ?? {};
       this._ccnAddButton.options.serialize = false;
 
+      this._ccnRefreshButton = this.addWidget(
+        "button",
+        "↻ Refresh Triggers",
+        null,
+        () => {
+          fetchTriggers(rowLoraNames(this), { force: true })
+            .then(() => resizeRows(this));
+        }
+      );
+      this._ccnRefreshButton.options = this._ccnRefreshButton.options ?? {};
+      this._ccnRefreshButton.options.serialize = false;
+
       addRow(this); // one starter row for discoverability
-      fetchLoraList().then(() => this.setDirtyCanvas(true, true));
+      fetchLoraEntries().then(() => this.setDirtyCanvas(true, true));
     };
 
     const origConfigure = nodeType.prototype.configure;
@@ -631,10 +635,8 @@ app.registerExtension({
           const id = rowValues[i].id ?? i + 1;
           rows[i].value = {
             on: true,
-            mode: "static",
             lora: "None",
-            strength_high: 1.0,
-            strength_low: 1.0,
+            strength: 1.0,
             ...rowValues[i],
             id,
           };
@@ -643,23 +645,25 @@ app.registerExtension({
         }
         this._ccnRowCounter = Math.max(this._ccnRowCounter ?? 0, maxId);
 
-        // Reconcile curve sockets AFTER links restore: lane rows get their
-        // socket if a hand-edited workflow lost it; orphaned curve_* sockets
-        // with no matching lane row are pruned.
-        const wanted = new Set(
-          rowWidgets(this)
-            .filter((r) => r.value.mode === "lane")
-            .map((r) => curveSocketName(r)));
-        for (const r of rowWidgets(this)) {
-          if (r.value.mode === "lane") ensureCurveSocket(this, r);
+        // Saves that predate the scalar widgets hold only row dicts, so
+        // positional application can stuff a row into them. Recover the
+        // saved values by type, falling back to defaults.
+        const enabledWidget = this.widgets.find((w) => w.name === "enabled");
+        if (enabledWidget) {
+          const saved = info.widgets_values.find((v) => typeof v === "boolean");
+          if (saved !== undefined) enabledWidget.value = saved;
+          else if (typeof enabledWidget.value !== "boolean") enabledWidget.value = true;
         }
-        for (let i = (this.inputs?.length ?? 0) - 1; i >= 0; i--) {
-          const nm = this.inputs[i].name;
-          if (nm.startsWith("curve_") && !wanted.has(nm)) {
-            this.removeInput(i);
-          }
+        const multWidget = this.widgets.find(
+          (w) => w.name === "strength_multiplier");
+        if (multWidget) {
+          const saved = info.widgets_values.find(
+            (v) => typeof v === "number" && Number.isFinite(v));
+          if (saved !== undefined) multWidget.value = saved;
+          else if (!Number.isFinite(multWidget.value)) multWidget.value = 1.0;
         }
       }
+      fetchTriggers(rowLoraNames(this)).then(() => resizeRows(this));
       this.setDirtyCanvas(true, true);
       return result;
     };

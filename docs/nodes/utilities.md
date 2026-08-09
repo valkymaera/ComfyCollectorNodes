@@ -13,6 +13,7 @@ small math helpers.
 | [Property Clear](#property-clear) | Clears stored properties by scope and/or key. |
 | [Property List](#property-list) | Lists all stored properties with value summaries. |
 | [Random Select](#random-select) | Randomly forwards one of up to 5 connected inputs. |
+| [Gate Any](#gate-any) | Pass any value through, or block the branch with a boolean. |
 | [Float Lerp](#float-lerp) | Unclamped linear interpolation between two floats. |
 | [Timer Start / Timer Stop](#timer-start-timer-stop) | Measure wall-clock time between two points in a graph. |
 | [Print](#print) | Prints a custom message to the console when it executes. |
@@ -87,6 +88,24 @@ run; a non-negative seed makes it reproducible.
 
 **Outputs:** `output` (the chosen value), `selected_index` (1-based; 0 if
 nothing connected).
+
+### Gate Any
+
+**Pass any value through when enabled; when disabled, everything downstream of
+the gate is silently skipped.**
+
+Drop it on any connection to toggle a whole branch on and off. With
+`skip_upstream` on, closing the gate also prevents the nodes feeding `value`
+from executing at all (lazy evaluation), so expensive upstream work is skipped
+too.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `value` | any | — | The value to pass through when the gate is open. |
+| `enabled` | BOOLEAN | true | When off, downstream nodes are silently skipped. |
+| `skip_upstream` | BOOLEAN | true | When the gate is closed, also skip the branch feeding `value`. |
+
+**Outputs:** `value` (passed through when enabled).
 
 ### Float Lerp
 
