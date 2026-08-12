@@ -21,7 +21,7 @@ All nodes appear in the ComfyUI menu with a `(CCN)` suffix.
 
 ## Install
 
-Clone into `ComfyUI/custom_nodes/` and restart ComfyUI. See
+Install via Comfy manager, OR Clone into `ComfyUI/custom_nodes/` and restart ComfyUI. See
 [Getting Started](https://valkymaera.github.io/ComfyCollectorNodes/getting-started/) for details.
 
 
