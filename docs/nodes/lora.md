@@ -1,6 +1,6 @@
 # LoRA
 
-Nodes for loading LoRAs — by index or filtered — and for
+Nodes for loading LoRAs — by index, filtered, or as a blended pair — and for
 working with LoRA files themselves: rescaling, shrinking, and inspecting them.
 
 ## At a glance
@@ -9,6 +9,7 @@ working with LoRA files themselves: rescaling, shrinking, and inspecting them.
 |------|---------|
 | [LoRA Loader By Index](#lora-loader-by-index) | Loads a LoRA by its numeric position in a sorted directory listing — built for sweeping a collection across runs. |
 | [LoRA Loader Filtered](#lora-loader-filtered) | The built-in LoRA loader with a dropdown sortable by date, name, or size (newest-first by default). |
+| [LoRA Split Loader](#lora-split-loader) | Blends two LoRAs with a single balance slider — 0 is all A, 1 is all B, 0.5 is both at half strength. |
 | [LoRA List Directory](#lora-list-directory) | Lists the LoRA files in a folder plus a count — a companion to index-based loading. |
 | [LoRA Scale & Save](#lora-scale-save) | Bakes a strength change into a LoRA (via alpha or weights) and saves it as a new file. |
 | [LoRA Truncate Rank](#lora-truncate-rank) | Shrinks an SVD-extracted LoRA by slicing it to a lower rank — fast, no re-decomposition. |
@@ -75,6 +76,46 @@ the tensor cache and the zero-strength short-circuit.
 If both strengths are `0.0` the inputs pass through untouched with no file
 load. File dates/sizes come from a small server endpoint and are cached in the
 browser, refreshed only when new files appear.
+
+### LoRA Split Loader
+
+**Loads two LoRAs — A and B — and blends between them with a single balance
+slider: `0.0` applies A at full strength, `1.0` applies B, `0.5` both at
+half.**
+
+The strengths are `A = (1 − balance) × strength_multiplier` and
+`B = balance × strength_multiplier`, applied to the model (and CLIP when
+connected). Each row has its own enable dot, and clicking a row's name opens
+a searchable picker — multi-term substring filtering plus A-Z / Newest
+sorting. Picked LoRAs show their top trigger words as chips under the row
+(click a chip to copy it), and each row displays a live read-only preview of
+the strength the slider currently gives it.
+
+`balance` is a plain FLOAT widget, so it can be converted to an input and
+driven by another node — for example [Float Lerp](utilities.md#float-lerp) to
+animate a morph from one LoRA to the other across a batch.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `model` | MODEL | — | Model to patch. |
+| `clip` | CLIP | *(optional)* | Also patched at the same strengths when connected. |
+| `enabled` | BOOLEAN | true | Off: model and CLIP pass through unchanged and no triggers are emitted. |
+| `balance` | FLOAT | 0.5 | The A↔B slider: `0.0` = A only, `1.0` = B only. |
+| `strength_multiplier` | FLOAT | 1.0 | Scales both final strengths (`-10`–`10`); `0` disables both. |
+| `lora_a`, `lora_b` | row | — | The two rows: enable dot, LoRA picker, trigger chips, effective-strength readout. |
+
+**Outputs:** `model`, `clip`, `triggers` (the top trigger words of every
+*applied* LoRA, comma-joined and deduped — ranked from embedded training
+metadata, the same extraction as [LoRA Metadata](#lora-metadata)).
+
+A side whose resolved strength is `0` — the slider at an extreme, or its row
+toggled off — is skipped entirely, including its trigger words; the other
+side keeps its slider-derived strength rather than renormalizing to full.
+Selecting the same LoRA in both slots loads the file once and applies it
+twice (the strengths sum). A row that references a missing file raises an
+error instead of silently skipping it.
+
+<!-- TODO: screenshot — LoRA Split Loader with both rows, trigger chips, and the balance slider -->
 
 ### LoRA List Directory
 

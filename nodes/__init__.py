@@ -56,6 +56,7 @@ from .rotate_image import RotateImage
 from .hyper_remap_krea2edit import HyperRemapKrea2Edit
 from .hyper_remap_krea2edit_slim import HyperRemapKrea2EditSlim
 from .lora_multi_loader import LoraMultiLoader
+from .lora_split_loader import LoraSplitLoader
 from .gate_any import GateAny
 from .minimax_h3_ref_tinker import MiniMaxH3RefTinker
 
@@ -137,6 +138,7 @@ NODE_CLASS_MAPPINGS = {
     "CCN_HyperRemapKrea2Edit": HyperRemapKrea2Edit,
     "CCN_HyperRemapKrea2EditSlim": HyperRemapKrea2EditSlim,
     "CCN_LoraMultiLoader": LoraMultiLoader,
+    "CCN_LoraSplitLoader": LoraSplitLoader,
     "CCN_GateAny": GateAny,
     "CCN_MiniMaxH3RefTinker": MiniMaxH3RefTinker,
 }
@@ -219,6 +221,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_HyperRemapKrea2Edit": "Hyper Remap Krea2 Edit (CCN)",
     "CCN_HyperRemapKrea2EditSlim": "Hyper Remap Krea2 Edit Slim (CCN)",
     "CCN_LoraMultiLoader": "LoRA Multi Loader (CCN)",
+    "CCN_LoraSplitLoader": "LoRA Split Loader (CCN)",
     "CCN_GateAny": "Gate Any (CCN)",
     "CCN_MiniMaxH3RefTinker": "MiniMax H3 Ref Tinker (CCN)",
 }

@@ -1,7 +1,7 @@
 # Image & Video
 
-Nodes for resizing, blending, cropping, and compositing images, computing
-dimensions, and loading images and video frames.
+Nodes for resizing, blending, cropping, rotating, and compositing images,
+computing dimensions, and loading images and video frames.
 
 ## At a glance
 
@@ -12,6 +12,7 @@ dimensions, and loading images and video frames.
 | [Image Blend](#image-blend) | Linearly blends two image batches, auto-resizing the second to match. |
 | [Cropped Image](#cropped-image) | Interactive crop tool — drag a rectangle on a canvas in the node, get the crop, mask, and geometry. |
 | [Image Inset](#image-inset) | Composites up to three images onto a base via draggable placement rectangles. |
+| [Rotate Image](#rotate-image) | Interactive rotation — drag on a canvas to rotate around a draggable pivot, with a mask of the uncovered areas. |
 | [Dimension Scale](#dimension-scale) | Computes scaled width/height numbers relative to a reference resolution — no image needed. |
 | [Image Loader By Index](#image-loader-by-index) | Loads one image from a folder by sorted index, wrapping past the end. |
 | [Video Loader By Index](#video-loader-by-index) | Loads a video from a folder by index and decodes its frames to an image batch. |
@@ -156,6 +157,44 @@ composited. For a batched base, a single-image embed is reused across every
 frame.
 
 <!-- TODO: screenshot — Image Inset with three colored placement rectangles over a base image -->
+
+### Rotate Image
+
+**An interactive visual rotation tool: drag on a canvas inside the node to
+rotate the image live around a draggable pivot, and get back the rotated
+image plus a mask of the uncovered areas for inpainting.**
+
+The node shows the image on a canvas. Drag anywhere to rotate (hold Shift to
+snap to 15° steps) and drag the crosshair to place the pivot. With `expand`
+off the output keeps the input frame — content rotates around the pivot,
+corners crop away, and areas the image no longer covers are painted
+`fill_color`. With `expand` on the output grows to the rotated bounding box
+and the pivot has no effect; exact quarter turns in this mode are bit-exact
+(no resampling). The `mask` output is white wherever the fill shows —
+including the bounding-box corners in expand mode — ready to drive
+inpainting of the uncovered regions.
+
+Like [Cropped Image](#cropped-image), it can act as a standalone image
+loader: when nothing is wired to `image`, upload a file or pick one from the
+input directory via `loaded_image`.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `angle` | FLOAT | 0.0 | Rotation in degrees, positive = clockwise (`-360`–`360`). |
+| `expand` | BOOLEAN | false | Off: keep the input dimensions. On: grow to the rotated bounding box. |
+| `fill_color` | STRING | `#000000` | 3- or 6-digit hex color painted where the image no longer covers the frame. |
+| `interpolation` | choice | `bilinear` | `bilinear`, `nearest`, or `bicubic`. |
+| `image` | IMAGE | *(optional)* | Wired source; takes priority over `loaded_image`. |
+| `loaded_image` | choice | `none` | File from the input directory when no image is wired (supports upload). |
+| `debug` | BOOLEAN | false | Print source/angle/output diagnostics. |
+
+*(Two hidden `pivot_x`/`pivot_y` widgets hold the normalized pivot; the
+canvas manages them.)*
+
+**Outputs:** `image` (rotated), `mask` (white where the fill shows), `source_image`
+(the unrotated input, passthrough).
+
+<!-- TODO: screenshot — Rotate Image canvas mid-drag with the pivot crosshair visible -->
 
 ### Dimension Scale
 

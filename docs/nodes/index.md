@@ -25,14 +25,15 @@ CFG step.
 
 ### [LoRA](lora.md)
 
-Loading LoRAs — by index or sorted/filtered — and file tools:
-LoRA Scale & Save, LoRA Truncate Rank, and the LoRA / Safetensors metadata
-inspectors.
+Loading LoRAs — by index, sorted/filtered, or blended as a pair with the
+LoRA Split Loader — and file tools: LoRA Scale & Save, LoRA Truncate Rank,
+and the LoRA / Safetensors metadata inspectors.
 
 ### [Image & Video](image.md)
 
-Resize, blend, and dimension helpers; the interactive Cropped Image and Image
-Inset canvas tools; and the image/video loaders including the Video Scrubber.
+Resize, blend, and dimension helpers; the interactive Cropped Image, Image
+Inset, and Rotate Image canvas tools; and the image/video loaders including
+the Video Scrubber.
 
 ### [Latent](latent.md)
 
