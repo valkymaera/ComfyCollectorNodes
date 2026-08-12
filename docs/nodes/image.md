@@ -278,10 +278,12 @@ single frame you land on — for example to branch a new generation from a
 chosen split point.**
 
 Videos live in ComfyUI's `input` directory (the node has its own **Upload
-Video** button that handles large files the stock uploader rejects). The
-widget shows a live preview that updates as you drag the slider or step with
-the ◀ ▶ buttons (step size is configurable), with a frame counter and
-dimensions readout.
+Video** button that handles large files the stock uploader rejects). Picking
+a video that has already been uploaded — even from its original folder —
+retargets the node to the existing copy instantly instead of re-uploading it;
+nothing in the input directory is ever overwritten. The widget shows a live
+preview that updates as you drag the slider or step with the ◀ ▶ buttons
+(step size is configurable), with a frame counter and dimensions readout.
 
 Scrubbing uses fast keyframe seeks, which are quick but codec-approximate.
 **Load Exact Frame** does a frame-accurate decode of the current position and

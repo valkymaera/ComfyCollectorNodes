@@ -3,7 +3,8 @@ Video Scrubber - Video loader with in-node frame preview and scrubbing.
 
 Registers API routes so the frontend scrubber widget can fetch frame
 thumbnails (/frame), video metadata (/info), on-demand exact frames
-(/exact), and upload large videos (/upload) without running the full node.
+(/exact), detect already-uploaded videos (/check), and upload large
+videos (/upload) without running the full node.
 
 The /frame route is the fast scrubbing preview: a persistent per-video
 decoder steps forward from the last shown frame (keyframe-seeking on
@@ -19,7 +20,9 @@ import os
 import re
 import io
 import sys
+import time
 import asyncio
+import itertools
 import threading
 import numpy as np
 import torch
@@ -51,16 +54,41 @@ AV_MISSING_ERROR = (
 CACHE_SUBFOLDER = "Video Scrubber Frames"
 
 
+def _path_is_contained(path):
+    """
+    True only if path resolves inside one of ComfyUI's base directories
+    (input/output/temp). The API routes accept filenames from unauthenticated
+    query params, so a '..' component must never escape those roots.
+    """
+    if not path:
+        return False
+    real = os.path.realpath(path)
+    bases = (
+        folder_paths.get_input_directory(),
+        folder_paths.get_output_directory(),
+        folder_paths.get_temp_directory(),
+    )
+    for base in bases:
+        base = os.path.realpath(base)
+        try:
+            if os.path.commonpath([real, base]) == base:
+                return True
+        except ValueError:
+            # Different drives — cannot be contained.
+            continue
+    return False
+
+
 def _resolve_video_path(filename):
     """Resolve a video filename to its full filesystem path."""
     if not filename:
         return None
     # get_annotated_filepath handles subfolder annotations like "sub/file.mp4 [input]"
     filepath = folder_paths.get_annotated_filepath(filename)
-    if filepath and os.path.isfile(filepath):
+    if filepath and _path_is_contained(filepath) and os.path.isfile(filepath):
         return filepath
     fallback = os.path.join(folder_paths.get_input_directory(), filename)
-    if os.path.isfile(fallback):
+    if _path_is_contained(fallback) and os.path.isfile(fallback):
         return fallback
     return None
 
@@ -204,8 +232,14 @@ def _extract_frame_rgb(filepath, frame_idx, accurate=False):
 _SCRUB_FORWARD_WINDOW = 240
 _SCRUB_MAX_SESSIONS = 4
 
+# An open session holds a file handle, which on Windows blocks deleting the
+# video in Explorer — so idle sessions are closed by a background sweep.
+_SCRUB_IDLE_TTL = 60.0
+_SCRUB_SWEEP_INTERVAL = 15.0
+
 _scrub_sessions = {}  # normalized path -> _ScrubSession (insertion order = LRU)
 _scrub_sessions_lock = threading.Lock()
+_scrub_sweeper_started = False  # guarded by _scrub_sessions_lock
 
 
 class _ScrubSession:
@@ -235,6 +269,7 @@ class _ScrubSession:
         self.lock = threading.Lock()
         self.last_idx = None
         self.last_jpeg = None
+        self.last_used = time.monotonic()
 
     def close(self):
         try:
@@ -315,24 +350,85 @@ def _session_key(filepath):
     return os.path.normcase(os.path.abspath(filepath))
 
 
+def _sweep_idle_sessions():
+    """
+    Background loop closing sessions idle past the TTL, freeing their file
+    handles so Windows lets the user delete or replace scrubbed videos.
+    Sessions mid-decode are skipped (non-blocking acquire) until a later pass.
+    """
+    while True:
+        time.sleep(_SCRUB_SWEEP_INTERVAL)
+        now = time.monotonic()
+        to_close = []
+        with _scrub_sessions_lock:
+            for key, session in list(_scrub_sessions.items()):
+                if now - session.last_used < _SCRUB_IDLE_TTL:
+                    continue
+                if not session.lock.acquire(blocking=False):
+                    continue
+                del _scrub_sessions[key]
+                to_close.append(session)
+        for session in to_close:
+            try:
+                session.close()
+            finally:
+                session.lock.release()
+
+
+def _ensure_sweeper():
+    """Start the idle sweeper once (caller holds _scrub_sessions_lock)."""
+    global _scrub_sweeper_started
+    if _scrub_sweeper_started:
+        return
+    _scrub_sweeper_started = True
+    threading.Thread(
+        target=_sweep_idle_sessions, name="ccn-scrub-sweeper", daemon=True
+    ).start()
+
+
 def _get_scrub_session(filepath):
-    """Return a cached-or-new session for filepath, LRU-capped, mtime-checked."""
+    """
+    Return a cached-or-new session for filepath, LRU-capped, mtime-checked,
+    idle-swept. The global lock is never held across av.open or a blocking
+    session.lock acquire — either can take seconds and would otherwise stall
+    every /frame request (and any event-loop caller of _drop_scrub_session).
+    """
     key = _session_key(filepath)
     mtime = os.path.getmtime(filepath)
+    stale = None
     with _scrub_sessions_lock:
         session = _scrub_sessions.pop(key, None)
         if session is not None and session.mtime != mtime:
-            with session.lock:
-                session.close()
+            stale = session
             session = None
-        if session is None:
-            session = _ScrubSession(filepath)
-        _scrub_sessions[key] = session  # re-insert = most recently used
-        while len(_scrub_sessions) > _SCRUB_MAX_SESSIONS:
-            oldest = _scrub_sessions.pop(next(iter(_scrub_sessions)))
-            with oldest.lock:
-                oldest.close()
+        if session is not None:
+            session.last_used = time.monotonic()
+            _scrub_sessions[key] = session  # re-insert = most recently used
+    if stale is not None:
+        with stale.lock:
+            stale.close()
+    if session is not None:
         return session
+
+    session = _ScrubSession(filepath)
+    to_close = []
+    with _scrub_sessions_lock:
+        existing = _scrub_sessions.pop(key, None)
+        if existing is not None and existing.mtime == session.mtime:
+            # A racing request registered a session first — keep theirs.
+            to_close.append(session)
+            session = existing
+        elif existing is not None:
+            to_close.append(existing)
+        session.last_used = time.monotonic()
+        _scrub_sessions[key] = session
+        _ensure_sweeper()
+        while len(_scrub_sessions) > _SCRUB_MAX_SESSIONS:
+            to_close.append(_scrub_sessions.pop(next(iter(_scrub_sessions))))
+    for old in to_close:
+        with old.lock:
+            old.close()
+    return session
 
 
 def _drop_scrub_session(filepath):
@@ -353,6 +449,8 @@ def _scrub_frame_jpeg(filepath, frame_idx, max_dim=512):
         session = _get_scrub_session(filepath)
         with session.lock:
             data = session.frame_jpeg(frame_idx, max_dim)
+        # Touch after the decode too, so a long seek can't look idle.
+        session.last_used = time.monotonic()
         if data is not None:
             return data
     except (av.FFmpegError, EOFError, OSError, ValueError):
@@ -401,6 +499,9 @@ def _cache_is_valid(cache_path, video_path):
         return False
 
 
+_temp_counter = itertools.count()
+
+
 def _extract_and_cache(filepath, frame_idx, cache_path):
     """
     Decode one frame accurately and write it full-res to cache_path.
@@ -409,9 +510,20 @@ def _extract_and_cache(filepath, frame_idx, cache_path):
     rgb = _extract_frame_rgb(filepath, frame_idx, accurate=True)
     if rgb is None:
         return False
-    # Frame is already RGB here, so PIL writes it directly — matching the
-    # still-image convention used elsewhere in the pack (no BGR juggling).
-    Image.fromarray(rgb).save(cache_path, compress_level=4)
+    # Write via a unique temp + atomic rename so a crash or a concurrent
+    # request for the same frame never exposes a partial PNG.
+    tmp_path = f"{cache_path}.{os.getpid()}-{next(_temp_counter)}.tmp"
+    try:
+        # Frame is already RGB here, so PIL writes it directly — matching the
+        # still-image convention used elsewhere in the pack (no BGR juggling).
+        Image.fromarray(rgb).save(tmp_path, format="PNG", compress_level=4)
+        os.replace(tmp_path, cache_path)
+    except OSError:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
     return True
 
 
@@ -426,7 +538,10 @@ async def _api_frame(request):
         return web.Response(status=500, text=AV_MISSING_ERROR)
 
     filename = request.query.get("filename", "")
-    frame_idx = int(request.query.get("frame", "0"))
+    try:
+        frame_idx = int(request.query.get("frame", "0"))
+    except ValueError:
+        return web.Response(status=400, text="Invalid frame index")
 
     filepath = _resolve_video_path(filename)
     if not filepath:
@@ -479,7 +594,10 @@ async def _api_exact(request):
         return web.json_response({"error": AV_MISSING_ERROR}, status=500)
 
     filename = request.query.get("filename", "")
-    frame_idx = int(request.query.get("frame", "0"))
+    try:
+        frame_idx = int(request.query.get("frame", "0"))
+    except ValueError:
+        return web.json_response({"error": "invalid frame index"}, status=400)
 
     filepath = _resolve_video_path(filename)
     if not filepath:
@@ -523,6 +641,128 @@ def _unique_input_path(input_dir, filename):
     return os.path.join(input_dir, f"{stem}_{i}{ext}")
 
 
+_UPLOAD_TEMP_SUFFIX = ".ccn-upload.part"
+
+
+def _find_family_match(input_dir, filename, size):
+    """
+    Find an already-uploaded copy of a video: an existing input file from the
+    same name family (stem.ext or the stem_<n>.ext suffixes that collision
+    handling produces) whose byte size equals the picked file's. Users re-pick
+    the same source video externally as shorthand, so a match means "retarget
+    to this" instead of streaming gigabytes again — no family member is ever
+    re-copied. Returns the matching basename, or None.
+    """
+    if size <= 0:
+        return None
+    base = os.path.join(input_dir, filename)
+    try:
+        if os.path.isfile(base) and os.path.getsize(base) == size:
+            return filename
+    except OSError:
+        pass
+    stem, ext = os.path.splitext(filename)
+    variant = re.compile(
+        re.escape(stem) + r"_\d+" + re.escape(ext), re.IGNORECASE
+    )
+    try:
+        names = os.listdir(input_dir)
+    except OSError:
+        return None
+    for name in sorted(names):
+        if not variant.fullmatch(name):
+            continue
+        path = os.path.join(input_dir, name)
+        try:
+            if os.path.isfile(path) and os.path.getsize(path) == size:
+                return name
+        except OSError:
+            continue
+    return None
+
+
+def _publish_upload(temp_path, input_dir, filename):
+    """
+    Publish a fully-streamed temp file under its final name; runs in a thread
+    executor. Re-runs the family dedupe with the actual received size (the
+    frontend preflight is only a shortcut — this check is authoritative), so
+    a concurrent identical upload still converges on one file. Publishing is
+    an atomic rename: no reader ever sees a partial video, and no existing
+    file is ever overwritten. Returns the final basename.
+    """
+    size = os.path.getsize(temp_path)
+    match = _find_family_match(input_dir, filename, size)
+    if match is not None:
+        os.remove(temp_path)
+        return match
+    target = _unique_input_path(input_dir, filename)
+    last_err = None
+    for _ in range(5):
+        # A stale scrub session on this name would hold a Windows read
+        # handle open without FILE_SHARE_DELETE, failing the rename.
+        _drop_scrub_session(target)
+        try:
+            os.replace(temp_path, target)
+            return os.path.basename(target)
+        except PermissionError as e:
+            # Retry only transient Windows sharing violations (antivirus,
+            # indexer); anything else is a real error.
+            if getattr(e, "winerror", None) not in (5, 32):
+                raise
+            last_err = e
+            time.sleep(0.25)
+    raise last_err
+
+
+def _cleanup_stale_upload_temps():
+    """
+    Remove upload temp files orphaned by a crash or killed server. Age-gated
+    to an hour so two ComfyUI instances sharing an input directory can't
+    delete each other's in-flight uploads.
+    """
+    try:
+        input_dir = folder_paths.get_input_directory()
+        names = os.listdir(input_dir)
+    except OSError:
+        return
+    cutoff = time.time() - 3600
+    for name in names:
+        if not name.endswith(_UPLOAD_TEMP_SUFFIX):
+            continue
+        path = os.path.join(input_dir, name)
+        try:
+            if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                os.remove(path)
+        except OSError:
+            continue
+
+
+_cleanup_stale_upload_temps()
+
+
+@PromptServer.instance.routes.get("/ccn/video_scrubber/check")
+async def _api_check(request):
+    """
+    Preflight for uploads: report whether a video of this name family and
+    size already exists in the input folder, so the frontend can retarget
+    to it instantly instead of re-uploading.
+    """
+    filename = os.path.basename(request.query.get("filename", ""))
+    try:
+        size = int(request.query.get("size", "0"))
+    except ValueError:
+        return web.json_response({"error": "invalid size"}, status=400)
+    if not filename:
+        return web.json_response({"status": "no_match"})
+
+    match = _find_family_match(
+        folder_paths.get_input_directory(), filename, size
+    )
+    if match is not None:
+        return web.json_response({"status": "match", "name": match})
+    return web.json_response({"status": "no_match"})
+
+
 @PromptServer.instance.routes.post("/ccn/video_scrubber/upload")
 async def _api_upload(request):
     """
@@ -531,8 +771,11 @@ async def _api_upload(request):
     ComfyUI's stock /upload/image reads the whole body into memory and is
     capped by the server's max-upload-size (100 MB by default), so large
     videos fail there with a 413. This route lifts the per-request cap and
-    writes the file to disk in chunks, so neither file size nor available RAM
-    is a constraint.
+    streams to a temp file in chunks, so neither file size nor available RAM
+    is a constraint. The temp file is published with an atomic rename (after
+    a size-based dedupe against the existing name family), so a workflow
+    reading an existing video mid-upload never sees partial data and nothing
+    already in the input folder is ever overwritten or duplicated.
     """
     # Lift aiohttp's per-request body size cap — the app-wide limit that
     # otherwise rejects large videos. Must be set before the body is read.
@@ -542,43 +785,64 @@ async def _api_upload(request):
     # disables the cap under both behaviors.
     request._client_max_size = sys.maxsize
 
+    loop = asyncio.get_running_loop()
+    input_dir = folder_paths.get_input_directory()
+    temp_path = None
     try:
         reader = await request.multipart()
-        overwrite = False
         saved_name = None
 
         while True:
             part = await reader.next()
             if part is None:
                 break
-
-            # The frontend sends "overwrite" before the file part so this is
-            # known by the time the filename is resolved below.
-            if part.name == "overwrite":
-                text = (await part.text()).strip().lower()
-                overwrite = text in ("1", "true", "yes")
+            if not part.filename:
                 continue
 
-            if part.filename:
-                # basename guards against path traversal in the supplied name
-                filename = os.path.basename(part.filename)
-                if not filename:
-                    continue
-                input_dir = folder_paths.get_input_directory()
-                target = os.path.join(input_dir, filename)
-                if os.path.exists(target) and not overwrite:
-                    target = _unique_input_path(input_dir, filename)
-                # Close any scrub session holding this file open — on Windows
-                # an open read handle would fail the overwrite.
-                _drop_scrub_session(target)
-                with open(target, "wb") as out:
-                    while True:
-                        chunk = await part.read_chunk(1024 * 1024)
-                        if not chunk:
-                            break
-                        out.write(chunk)
-                saved_name = os.path.basename(target)
+            # basename guards against path traversal in the supplied name
+            filename = os.path.basename(part.filename)
+            if not filename:
+                continue
+            if not filename.lower().endswith(VIDEO_EXTENSIONS):
+                return web.json_response(
+                    {"error": f"unsupported file type: {filename}"},
+                    status=400,
+                )
+
+            # The .part suffix never matches VIDEO_EXTENSIONS, so in-flight
+            # uploads can't show up in the node's dropdown or resolve as
+            # videos; pid + counter keeps concurrent uploads distinct.
+            temp_path = os.path.join(
+                input_dir,
+                f"{filename}.{os.getpid()}-{next(_temp_counter)}"
+                f"{_UPLOAD_TEMP_SUFFIX}",
+            )
+            received = 0
+            with open(temp_path, "wb") as out:
+                while True:
+                    chunk = await part.read_chunk(1024 * 1024)
+                    if not chunk:
+                        break
+                    received += len(chunk)
+                    # Write in an executor so a slow disk or an antivirus
+                    # scan never stalls the server's event loop.
+                    await loop.run_in_executor(None, out.write, chunk)
+            if received == 0:
+                os.remove(temp_path)
+                temp_path = None
+                return web.json_response(
+                    {"error": "empty upload"}, status=400
+                )
+            saved_name = await loop.run_in_executor(
+                None, _publish_upload, temp_path, input_dir, filename
+            )
+            temp_path = None
     except Exception as e:
+        if temp_path is not None:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
         return web.json_response({"error": str(e)}, status=500)
 
     if not saved_name:
@@ -701,10 +965,14 @@ class VideoScrubber:
         cache_path = os.path.join(
             _cache_dir(), _cache_filename(video, frame_index)
         )
+        rgb = None
         if _cache_is_valid(cache_path, filepath):
-            pil = Image.open(cache_path).convert("RGB")
-            rgb = np.array(pil)
-        else:
+            try:
+                rgb = np.array(Image.open(cache_path).convert("RGB"))
+            except (OSError, ValueError):
+                # Cache cleared or corrupted mid-queue — fall back to decode.
+                rgb = None
+        if rgb is None:
             rgb = _extract_frame_rgb(filepath, frame_index, accurate=False)
 
         if rgb is None:
@@ -723,7 +991,13 @@ class VideoScrubber:
         filepath = _resolve_video_path(video)
         if not filepath:
             return ""
+        # Clamp exactly like load_video so the cache-state component keys
+        # the same PNG the loader will actually read.
         frame_index = scrub_frame
+        if HAS_AV:
+            total_frames, _, _, _ = _get_video_info(filepath)
+            if total_frames > 0:
+                frame_index = max(0, min(scrub_frame, total_frames - 1))
         cache_path = os.path.join(
             _cache_dir(), _cache_filename(video, frame_index)
         )

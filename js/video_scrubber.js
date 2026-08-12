@@ -301,6 +301,22 @@ app.registerExtension({
 
         uploadBtn.addEventListener("click", () => fileInput.click());
 
+        // Point the node at an input-folder video by name: add it to the
+        // combo if needed, select it, and refresh metadata + preview.
+        function adoptVideoName(name) {
+            if (!name) return;
+            if (
+                videoWidget.options?.values &&
+                !videoWidget.options.values.includes(name)
+            ) {
+                videoWidget.options.values.push(name);
+                videoWidget.options.values.sort();
+            }
+            videoWidget.value = name;
+            lastFilename = "";
+            onVideoChange(name);
+        }
+
         fileInput.addEventListener("change", async () => {
             const file = fileInput.files?.[0];
             if (!file) return;
@@ -309,10 +325,29 @@ app.registerExtension({
             uploadBtn.disabled = true;
 
             try {
-                // overwrite is appended first so the server route reads it
-                // before the file part it streams to disk
+                // Preflight: users often re-pick the same source video from
+                // its original folder as shorthand. If a same-name-family,
+                // same-size file is already in the input folder, retarget to
+                // it instead of streaming gigabytes again.
+                try {
+                    const checkResp = await api.fetchApi(
+                        `/ccn/video_scrubber/check` +
+                        `?filename=${encodeURIComponent(file.name)}` +
+                        `&size=${file.size}`
+                    );
+                    if (checkResp.ok) {
+                        const check = await checkResp.json();
+                        if (check.status === "match" && check.name) {
+                            adoptVideoName(check.name);
+                            uploadBtn.textContent = "Upload Video";
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    // Preflight is only a shortcut — fall through and upload.
+                }
+
                 const body = new FormData();
-                body.append("overwrite", "true");
                 body.append("image", file);
 
                 // Custom streaming route, not /upload/image: the stock endpoint
@@ -325,19 +360,9 @@ app.registerExtension({
 
                 if (resp.ok) {
                     const data = await resp.json();
-                    const name = data.name;
-
-                    // add to combo dropdown if not already present
-                    if (name && videoWidget.options?.values) {
-                        if (!videoWidget.options.values.includes(name)) {
-                            videoWidget.options.values.push(name);
-                            videoWidget.options.values.sort();
-                        }
-                    }
-
-                    videoWidget.value = name;
-                    lastFilename = "";
-                    onVideoChange(name);
+                    // The server may dedupe to an existing file or pick a
+                    // suffixed name — always adopt what it reports.
+                    adoptVideoName(data.name);
                     uploadBtn.textContent = "Upload Video";
                 } else {
                     const detail = await resp.text().catch(() => "");
