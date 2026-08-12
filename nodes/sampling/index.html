@@ -1,0 +1,1604 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Custom nodes for ComfyUI — conditioning, latents, LoRA loading, prompt construction, and workflow utilities.">
+      
+      
+      
+        <link rel="canonical" href="https://valkymaera.github.io/ComfyCollectorNodes/nodes/sampling/">
+      
+      
+        <link rel="prev" href="../conditioning/">
+      
+      
+        <link rel="next" href="../lora/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Sampling & Guidance - ComfyCollectorNodes</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#sampling-guidance" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ComfyCollectorNodes" class="md-header__button md-logo" aria-label="ComfyCollectorNodes" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ComfyCollectorNodes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Sampling & Guidance
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/valkymaera/ComfyCollectorNodes" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valkymaera/ComfyCollectorNodes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ComfyCollectorNodes" class="md-nav__button md-logo" aria-label="ComfyCollectorNodes" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ComfyCollectorNodes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/valkymaera/ComfyCollectorNodes" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    valkymaera/ComfyCollectorNodes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Nodes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../conditioning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Conditioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling & Guidance
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampling & Guidance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curves
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Curves">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#curve-sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curve Sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#curve-cfg-guider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curve CFG Guider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cfg-zero-scaled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CFG-Zero* Scaled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#neutral-prompt-family" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt family
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Neutral Prompt family">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt Entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt-empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt Empty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt-guider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt Guider
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lora/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LoRA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Image & Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../latent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Latent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prompt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prompt & Text
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../utilities/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Utilities
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#curves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curves
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Curves">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#curve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#curve-sample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curve Sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#curve-cfg-guider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Curve CFG Guider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cfg-zero-scaled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CFG-Zero* Scaled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#neutral-prompt-family" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt family
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Neutral Prompt family">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt Entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt-empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt Empty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neutral-prompt-guider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neutral Prompt Guider
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="sampling-guidance">Sampling &amp; Guidance<a class="headerlink" href="#sampling-guidance" title="Permanent link">&para;</a></h1>
+<p>Nodes that change how the sampler is guided: curve-scheduled CFG, CFG-Zero*,
+and the Neutral Prompt family for combining auxiliary prompts at the CFG step.</p>
+<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#curve">Curve</a></td>
+<td>Defines a reusable Hermite curve in a visual editor and outputs it as a <code>CCN_CURVE</code>.</td>
+</tr>
+<tr>
+<td><a href="#curve-sample">Curve Sample</a></td>
+<td>Evaluates a curve at a position and returns the float — drive any value from a drawn curve.</td>
+</tr>
+<tr>
+<td><a href="#curve-cfg-guider">Curve CFG Guider</a></td>
+<td>A guider whose CFG scale follows a drawn curve across the sampling steps.</td>
+</tr>
+<tr>
+<td><a href="#cfg-zero-scaled">CFG-Zero* Scaled</a></td>
+<td>CFG-Zero<em> guidance with a continuous strength blend and configurable early-step attenuation. </em>(Experimental)*</td>
+</tr>
+<tr>
+<td><a href="#neutral-prompt">Neutral Prompt</a></td>
+<td>Patches a model so an auxiliary prompt merges into CFG via perpendicular, salient, or top-k strategies.</td>
+</tr>
+<tr>
+<td><a href="#neutral-prompt-entry">Neutral Prompt Entry</a></td>
+<td>Packages one auxiliary conditioning + strategy into a chainable entry list for the guider.</td>
+</tr>
+<tr>
+<td><a href="#neutral-prompt-empty">Neutral Prompt Empty</a></td>
+<td>Outputs an empty entry list — the "disabled" branch for switches.</td>
+</tr>
+<tr>
+<td><a href="#neutral-prompt-guider">Neutral Prompt Guider</a></td>
+<td>Curve-scheduled CFG guider that also applies Neutral Prompt strategies natively.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="curves">Curves<a class="headerlink" href="#curves" title="Permanent link">&para;</a></h2>
+<p>A <strong>curve</strong> in this pack (<code>CCN_CURVE</code> socket type) is a list of Hermite
+keyframes — position, value, and tangents in normalized 0–1 space — evaluated
+with cubic Hermite interpolation, the same basis as Unity's AnimationCurves.
+Nodes that take a curve replace their <code>curve_data</code> text field with an
+interactive graphical editor:</p>
+<ul>
+<li><strong>Drag</strong> keyframes to move them; endpoints are pinned at x=0 and x=1 (their
+  height stays free).</li>
+<li><strong>Drag tangent handles</strong> to change slope; <strong>Shift+drag</strong> breaks the tangent
+  pair to adjust one side only.</li>
+<li><strong>Double-click</strong> empty curve area to add a keyframe; double-click a keyframe
+  to delete it.</li>
+<li><strong>Right-click</strong> a keyframe for break/mirror/delete options, or the widget
+  for "Reset Curve".</li>
+</ul>
+<p>The identical evaluation code runs in Python and in the editor, so the preview
+matches sampling exactly. When an external <code>curve</code> input is connected, the
+editor becomes a read-only live view of the connected curve.</p>
+<!-- TODO: screenshot — the curve editor widget with keyframes and tangent handles -->
+
+<h3 id="curve">Curve<a class="headerlink" href="#curve" title="Permanent link">&para;</a></h3>
+<p><strong>Defines a reusable curve in a visual editor and outputs it as a <code>CCN_CURVE</code>
+value.</strong></p>
+<p>Wire the output into <a href="#curve-sample">Curve Sample</a>,
+<a href="#curve-cfg-guider">Curve CFG Guider</a>, or
+<a href="#neutral-prompt-guider">Neutral Prompt Guider</a> so one editor drives several
+consumers.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>curve_data</code></td>
+<td>curve editor</td>
+<td>linear 0→1</td>
+<td>The curve (stored as JSON, edited visually).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>curve</code> (<code>CCN_CURVE</code>).</p>
+<h3 id="curve-sample">Curve Sample<a class="headerlink" href="#curve-sample" title="Permanent link">&para;</a></h3>
+<p><strong>Evaluates a curve at a single position and returns the resulting float.</strong></p>
+<p>Turns a drawn curve into a usable scalar — a strength, a weight, any float
+input. With <code>x_scale</code> you can map an input range <code>0..x_scale</code> onto the curve's
+0–1 domain (e.g. sample by frame number), and <code>y_scale</code> multiplies the output.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>t</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>Sample position.</td>
+</tr>
+<tr>
+<td><code>x_scale</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td><code>t</code> is divided by this before sampling (then clamped to 0–1).</td>
+</tr>
+<tr>
+<td><code>y_scale</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Output multiplier.</td>
+</tr>
+<tr>
+<td><code>curve_data</code></td>
+<td>curve editor</td>
+<td>linear 0→1</td>
+<td>Built-in curve.</td>
+</tr>
+<tr>
+<td><code>curve</code></td>
+<td>CCN_CURVE</td>
+<td><em>(optional)</em></td>
+<td>External curve; overrides <code>curve_data</code> when connected.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>FLOAT</code> — the sampled value × <code>y_scale</code>.</p>
+<h3 id="curve-cfg-guider">Curve CFG Guider<a class="headerlink" href="#curve-cfg-guider" title="Permanent link">&para;</a></h3>
+<p><strong>A guider whose CFG scale follows a drawn curve across the sampling steps,
+instead of staying constant.</strong></p>
+<p>Draw the shape — e.g. high guidance early, low late — and the guider maps the
+curve's 0–1 output onto <code>min_cfg</code>–<code>max_cfg</code> at every step. Use it with
+<code>SamplerCustomAdvanced</code>; the <code>sigmas</code> pass straight through so the same
+schedule feeds the sampler. Progress is derived from the current sigma rather
+than a call counter, so it stays correct with multi-evaluation samplers like
+Heun or DPM++ 2M.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>MODEL</td>
+<td>—</td>
+<td>The diffusion model.</td>
+</tr>
+<tr>
+<td><code>positive</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Positive conditioning.</td>
+</tr>
+<tr>
+<td><code>negative</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Negative conditioning.</td>
+</tr>
+<tr>
+<td><code>sigmas</code></td>
+<td>SIGMAS</td>
+<td>—</td>
+<td>The sampling schedule (also passed through).</td>
+</tr>
+<tr>
+<td><code>min_cfg</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>CFG when the curve outputs 0.</td>
+</tr>
+<tr>
+<td><code>max_cfg</code></td>
+<td>FLOAT</td>
+<td>7.0</td>
+<td>CFG when the curve outputs 1.</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td>choice</td>
+<td><code>step</code></td>
+<td><code>step</code> snaps progress to the nearest scheduled step; <code>sigma</code> measures progress linearly in sigma.</td>
+</tr>
+<tr>
+<td><code>sigma_decay</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Additionally attenuate CFG toward 1.0 as noise decreases (weaker guidance in the low-noise phase).</td>
+</tr>
+<tr>
+<td><code>curve_data</code></td>
+<td>curve editor</td>
+<td>descending 1→0</td>
+<td>The CFG curve.</td>
+</tr>
+<tr>
+<td><code>curve</code></td>
+<td>CCN_CURVE</td>
+<td><em>(optional)</em></td>
+<td>External curve; overrides the editor.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>guider</code> (for <code>SamplerCustomAdvanced</code>), <code>sigmas</code> (passed
+through).</p>
+<!-- TODO: screenshot — Curve CFG Guider wired into SamplerCustomAdvanced with a falling curve -->
+
+<h3 id="cfg-zero-scaled">CFG-Zero* Scaled<a class="headerlink" href="#cfg-zero-scaled" title="Permanent link">&para;</a></h3>
+<p><strong>Implements CFG-Zero* guidance — rescaling the unconditional term by an
+optimal projection coefficient — with a continuous strength blend and a
+configurable early-step attenuation.</strong></p>
+<div class="admonition note">
+<p class="admonition-title">Experimental</p>
+<p>Based on the <a href="https://github.com/WeichenFan/CFG-Zero-star">CFG-Zero* paper</a>.</p>
+</div>
+<p>CFG-Zero<em> computes, per batch item, the projection of the conditional
+prediction onto the unconditional one and uses it to rescale the unconditional
+term, reducing guidance over/under-shoot. This node adds two conveniences over
+the reference implementation: <code>strength</code> lerps continuously between plain CFG
+(0.0) and full CFG-Zero</em> (1.0), and the paper's "zero-init" of the first step
+is generalized to an <code>init_scale</code> multiplier over the first <code>init_steps</code>
+steps. The model is cloned; the original is untouched.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>MODEL</td>
+<td>—</td>
+<td>Model to patch.</td>
+</tr>
+<tr>
+<td><code>strength</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td><code>0</code> = vanilla CFG, <code>1</code> = full CFG-Zero*. Unclamped for experimentation.</td>
+</tr>
+<tr>
+<td><code>use_scaled_init</code></td>
+<td>BOOLEAN</td>
+<td>true</td>
+<td>Enable the early-step attenuation.</td>
+</tr>
+<tr>
+<td><code>init_scale</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>Multiplier applied to the prediction during init steps. <code>0.0</code> = the paper's zero-init; <code>1.0</code> = no effect.</td>
+</tr>
+<tr>
+<td><code>init_steps</code></td>
+<td>INT</td>
+<td>0</td>
+<td>Attenuation applies from step 0 through this index, inclusive.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>MODEL</code> (patched clone).</p>
+<hr />
+<h2 id="neutral-prompt-family">Neutral Prompt family<a class="headerlink" href="#neutral-prompt-family" title="Permanent link">&para;</a></h2>
+<p>These combine a main prompt with one or more <em>auxiliary</em> prompts at the CFG
+step, using strategies ported from ljleb's A1111 <code>sd-webui-neutral-prompt</code>
+extension. "Neutral" refers to the core idea: the auxiliary conditioning is
+made neutral toward the main prompt — its component parallel to the main
+direction is projected out — so it contributes only novel, non-contradicting
+information instead of fighting the main prompt.</p>
+<p><strong>The three strategies:</strong></p>
+<ul>
+<li><strong>perpendicular</strong> — keep only the part of the aux direction orthogonal to
+  the main prompt (Perp-Neg style). Adds a concept without contradicting the
+  main prompt.</li>
+<li><strong>salient</strong> — the aux only wins at positions where it activates more
+  strongly than the main signal; elsewhere it contributes nothing.</li>
+<li><strong>top_k</strong> — keep only the strongest <code>k_ratio</code> fraction of the aux's
+  elements and add those.</li>
+</ul>
+<p>Each entry also picks a <strong>side</strong>: <code>positive</code> merges the aux into the
+conditional side (adding a concept), <code>negative</code> merges into the
+unconditional side (e.g. composing several negatives that don't interfere
+with each other).</p>
+<p>There are two ways to use the strategies:</p>
+<ol>
+<li><strong><a href="#neutral-prompt">Neutral Prompt</a></strong> — patches the model's CFG function;
+   works with a standard KSampler; chain nodes to stack entries.</li>
+<li><strong><a href="#neutral-prompt-guider">Neutral Prompt Guider</a></strong> — a native GUIDER for
+   <code>SamplerCustomAdvanced</code>; aux conditionings go through the standard
+   preparation pipeline (areas, masks, hooks, ControlNet, IP-Adapter) and are
+   evaluated in a single batched forward pass, plus curve-scheduled CFG.
+   Prefer this when your workflow already uses custom sampling.</li>
+</ol>
+<!-- TODO: screenshot — comparison grid: base prompt vs aux via perpendicular / salient / top_k -->
+
+<h3 id="neutral-prompt">Neutral Prompt<a class="headerlink" href="#neutral-prompt" title="Permanent link">&para;</a></h3>
+<p><strong>Patches a MODEL so that during sampling an auxiliary conditioning is merged
+into the CFG step with a perpendicular, salient, or top-k strategy — usable
+with a standard KSampler.</strong></p>
+<p>Wire the model through the node into the sampler, feed <code>main_conditioning</code> in
+and its pass-through <code>conditioning</code> output to the sampler's positive input.
+Chain several Neutral Prompt nodes to stack multiple aux entries; each clone
+accumulates onto the previous ones.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>MODEL</td>
+<td>—</td>
+<td>Model to patch (cloned). Chain other Neutral Prompt outputs here.</td>
+</tr>
+<tr>
+<td><code>main_conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The main positive prompt (passed through to the output).</td>
+</tr>
+<tr>
+<td><code>aux_conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The auxiliary conditioning for this entry.</td>
+</tr>
+<tr>
+<td><code>strategy</code></td>
+<td>choice</td>
+<td>—</td>
+<td><code>perpendicular</code>, <code>salient</code>, or <code>top_k</code>.</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td>choice</td>
+<td>—</td>
+<td><code>positive</code> or <code>negative</code>.</td>
+</tr>
+<tr>
+<td><code>weight</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Strength of the aux effect (<code>-10</code>–<code>10</code>); negative inverts.</td>
+</tr>
+<tr>
+<td><code>k_ratio</code></td>
+<td>FLOAT</td>
+<td>0.05</td>
+<td><code>top_k</code> only: fraction of elements kept (0.05 = strongest 5%).</td>
+</tr>
+<tr>
+<td><code>cfg_rescale</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>Optional std-rescale toward the conditional prediction to curb over-exposure at high CFG (0 = off). Combined across a chain via max.</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print per-step diagnostics.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>model</code> (patched clone), <code>conditioning</code> (the main conditioning,
+passed through for wiring convenience).</p>
+<h3 id="neutral-prompt-entry">Neutral Prompt Entry<a class="headerlink" href="#neutral-prompt-entry" title="Permanent link">&para;</a></h3>
+<p><strong>Packages one auxiliary conditioning plus its strategy settings into an
+<code>NP_ENTRIES</code> list item for the guider.</strong></p>
+<p>Pure data — no math happens here. Chain entries by wiring one Entry's output
+into the next Entry's <code>entries</code> input, then feed the final list to
+<a href="#neutral-prompt-guider">Neutral Prompt Guider</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>conditioning</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>The aux conditioning.</td>
+</tr>
+<tr>
+<td><code>strategy</code></td>
+<td>choice</td>
+<td>—</td>
+<td><code>perpendicular</code>, <code>salient</code>, or <code>top_k</code>.</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td>choice</td>
+<td>—</td>
+<td><code>positive</code> or <code>negative</code>.</td>
+</tr>
+<tr>
+<td><code>weight</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>Strength (<code>-10</code>–<code>10</code>).</td>
+</tr>
+<tr>
+<td><code>k_ratio</code></td>
+<td>FLOAT</td>
+<td>0.05</td>
+<td><code>top_k</code> only.</td>
+</tr>
+<tr>
+<td><code>entries</code></td>
+<td>NP_ENTRIES</td>
+<td><em>(optional)</em></td>
+<td>Upstream list to append to.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>entries</code> (the accumulated list).</p>
+<h3 id="neutral-prompt-empty">Neutral Prompt Empty<a class="headerlink" href="#neutral-prompt-empty" title="Permanent link">&para;</a></h3>
+<p><strong>Outputs an empty <code>NP_ENTRIES</code> list.</strong></p>
+<p>Use it as the "disabled" branch of a switch so the guider always receives a
+valid input — with an empty list the guider behaves exactly like a plain
+<a href="#curve-cfg-guider">Curve CFG Guider</a>.</p>
+<p><strong>Inputs:</strong> none. <strong>Outputs:</strong> <code>entries</code> (empty).</p>
+<h3 id="neutral-prompt-guider">Neutral Prompt Guider<a class="headerlink" href="#neutral-prompt-guider" title="Permanent link">&para;</a></h3>
+<p><strong>A GUIDER that combines curve-scheduled CFG with the Neutral Prompt
+strategies, evaluated natively through the guider pipeline.</strong></p>
+<p>A drop-in superset of <a href="#curve-cfg-guider">Curve CFG Guider</a>: the CFG scale
+follows the curve between <code>min_cfg</code> and <code>max_cfg</code>, and every connected entry's
+aux conditioning is applied at the CFG step with its strategy. All
+conditionings — positive, negative, and every aux — go through standard
+preparation (areas, masks, timestep ranges, hooks, ControlNet, IP-Adapter) and
+are evaluated in one batched forward pass. Set <code>min_cfg == max_cfg</code> for a
+flat, non-curved CFG.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>MODEL</td>
+<td>—</td>
+<td>The model.</td>
+</tr>
+<tr>
+<td><code>positive</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Main positive prompt.</td>
+</tr>
+<tr>
+<td><code>negative</code></td>
+<td>CONDITIONING</td>
+<td>—</td>
+<td>Negative prompt.</td>
+</tr>
+<tr>
+<td><code>sigmas</code></td>
+<td>SIGMAS</td>
+<td>—</td>
+<td>The sampling schedule (also passed through).</td>
+</tr>
+<tr>
+<td><code>min_cfg</code></td>
+<td>FLOAT</td>
+<td>1.0</td>
+<td>CFG when the curve outputs 0.</td>
+</tr>
+<tr>
+<td><code>max_cfg</code></td>
+<td>FLOAT</td>
+<td>7.0</td>
+<td>CFG when the curve outputs 1.</td>
+</tr>
+<tr>
+<td><code>mode</code></td>
+<td>choice</td>
+<td><code>step</code></td>
+<td>Progress measurement: <code>step</code> or <code>sigma</code> (see Curve CFG Guider).</td>
+</tr>
+<tr>
+<td><code>sigma_decay</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Attenuate CFG toward 1.0 as noise decreases.</td>
+</tr>
+<tr>
+<td><code>cfg_rescale</code></td>
+<td>FLOAT</td>
+<td>0.0</td>
+<td>Std-rescale toward the conditional prediction (0 = off; applies when entries are present).</td>
+</tr>
+<tr>
+<td><code>debug</code></td>
+<td>BOOLEAN</td>
+<td>false</td>
+<td>Print per-entry, per-step diagnostics.</td>
+</tr>
+<tr>
+<td><code>curve_data</code></td>
+<td>curve editor</td>
+<td>descending 1→0</td>
+<td>The CFG curve.</td>
+</tr>
+<tr>
+<td><code>curve</code></td>
+<td>CCN_CURVE</td>
+<td><em>(optional)</em></td>
+<td>External curve; overrides the editor.</td>
+</tr>
+<tr>
+<td><code>np_entries</code></td>
+<td>NP_ENTRIES</td>
+<td><em>(optional)</em></td>
+<td>Entry chain from Neutral Prompt Entry. Empty/absent = plain curve CFG.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outputs:</strong> <code>guider</code> (for <code>SamplerCustomAdvanced</code>), <code>sigmas</code> (passed
+through).</p>
+<!-- TODO: screenshot — Entry → Entry → Neutral Prompt Guider → SamplerCustomAdvanced wiring -->
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
