@@ -23,6 +23,8 @@ import torch.nn.functional as F
 from PIL import Image, ImageOps
 import folder_paths
 
+from .rotate_image import _parse_hex_color
+
 
 # embed index -> (color name, hidden-widget prefix). Order is also paste order.
 _EMBEDS = [(1, "red"), (2, "green"), (3, "blue")]
@@ -94,6 +96,21 @@ class ImageInset:
                 "embed3": ("IMAGE",),
                 "loaded_image": (["none"] + files, {"image_upload": True}),
                 "debug": ("BOOLEAN", {"default": False}),
+                # Kept at the end of optional: widgets_values serializes
+                # positionally, so appending here leaves old saves' indices
+                # intact (the JS onConfigure guard handles the trailing shift).
+                "border_width": ("INT", {
+                    "default": 0, "min": 0, "max": 1024, "step": 1,
+                    "tooltip": "Border thickness in base-image pixels, drawn "
+                               "inside each rectangle (0 = none). The rectangle "
+                               "stays the total footprint; the embed shrinks to "
+                               "the inner box.",
+                }),
+                "border_color": ("STRING", {
+                    "default": "#000000",
+                    "tooltip": "Hex border color, 3- or 6-digit, '#' optional "
+                               "(like #1a2b3c).",
+                }),
             },
         }
 
@@ -103,8 +120,10 @@ class ImageInset:
     DESCRIPTION = (
         "Composite up to three scaled images into a base image.  Drag each "
         "embed's rectangle on the canvas to place it; the embed fills its "
-        "rectangle.  'compilation' is the composited result; 'base' passes the "
-        "source through.  The source is never modified."
+        "rectangle.  An optional border is drawn inside each rectangle "
+        "(border_width in base pixels, 0 = none), with the embed shrunk to "
+        "the inner box.  'compilation' is the composited result; 'base' "
+        "passes the source through.  The source is never modified."
     )
 
     @classmethod
@@ -148,11 +167,25 @@ class ImageInset:
         y2 = max(y1 + 1, min(y2, h))
         return x1, y1, x2, y2
 
-    def _composite(self, canvas, embed_rgb, rect, debug, color):
-        """Paste embed_rgb scaled to fill its pixel box into canvas (in place)."""
+    def _composite(self, canvas, embed_rgb, rect, debug, color, border_px, border_rgb):
+        """Paste embed_rgb scaled to fill its pixel box into canvas (in place).
+
+        With a border, the box's outer ring is filled with border_rgb and the
+        embed shrinks to the inner box — the rect stays the total footprint.
+        """
         b, h, w, _ = canvas.shape
         x1, y1, x2, y2 = self._rect_pixels(rect, w, h)
         box_w, box_h = x2 - x1, y2 - y1
+
+        # Uniform ring, clamped so the inner box stays at least 1x1.
+        eff = min(border_px, (box_w - 1) // 2, (box_h - 1) // 2)
+        if eff > 0:
+            canvas[:, y1:y2, x1:x2, :] = torch.tensor(
+                border_rgb, dtype=canvas.dtype, device=canvas.device
+            )
+        ix1, iy1 = x1 + eff, y1 + eff
+        ix2, iy2 = x2 - eff, y2 - eff
+        in_w, in_h = ix2 - ix1, iy2 - iy1
 
         embed_rgb = embed_rgb.to(device=canvas.device, dtype=canvas.dtype)
         embed_b = embed_rgb.shape[0]
@@ -166,18 +199,23 @@ class ImageInset:
             if scaled is None:
                 e = embed_rgb[ei:ei + 1].permute(0, 3, 1, 2)
                 e = F.interpolate(
-                    e, size=(box_h, box_w),
+                    e, size=(in_h, in_w),
                     mode="bilinear", align_corners=False,
                 )
                 scaled = torch.clamp(e.permute(0, 2, 3, 1)[0], 0.0, 1.0)
                 scaled_cache[ei] = scaled
-            canvas[bi, y1:y2, x1:x2, :] = scaled
+            canvas[bi, iy1:iy2, ix1:ix2, :] = scaled
 
         if debug:
+            border_note = ""
+            if border_px > 0:
+                border_note = f" | border {eff}px"
+                if eff != border_px:
+                    border_note += f" (requested {border_px})"
             print(
                 f"[CCN ImageInset] {color}: box ({x1},{y1})->({x2},{y2}) "
                 f"= {box_w}x{box_h} | embed {embed_b}x{embed_rgb.shape[2]}x"
-                f"{embed_rgb.shape[1]}"
+                f"{embed_rgb.shape[1]}{border_note}"
             )
 
     def _save_temp_preview(self, frame_hwc, prefix):
@@ -197,9 +235,19 @@ class ImageInset:
         embed3_x1, embed3_y1, embed3_x2, embed3_y2,
         image=None, embed1=None, embed2=None, embed3=None,
         loaded_image="none", debug=False,
+        border_width=0, border_color="#000000",
     ):
         src, source_label = self._resolve_source(image, loaded_image)
         b, h, w, _ = src.shape
+
+        # Self-clamp: VALIDATE_INPUTS returning True skips ComfyUI's built-in
+        # min/max checks, so an API prompt can deliver out-of-range values.
+        # The color only matters (and is only validated) when a border shows.
+        border_px = max(0, int(border_width))
+        border_rgb = (
+            _parse_hex_color(border_color, label="border_color")
+            if border_px > 0 else None
+        )
 
         rects = {
             1: (embed1_x1, embed1_y1, embed1_x2, embed1_y2),
@@ -214,7 +262,10 @@ class ImageInset:
             embed = embeds[idx]
             if embed is None:
                 continue
-            self._composite(compilation, _to_rgb(embed), rects[idx], debug, color)
+            self._composite(
+                compilation, _to_rgb(embed), rects[idx], debug, color,
+                border_px, border_rgb,
+            )
         compilation = torch.clamp(compilation, 0.0, 1.0)
 
         if debug:

@@ -11,6 +11,7 @@ runs, and general string manipulation.
 | [Prompt Builder B](#prompt-builder-b) | The same builder with technical/style sections (quality, style, mood, motion, general). |
 | [Prompt Store](#prompt-store) | A stateful Prompt Builder — sections persist server-side across runs and can be merged or appended. |
 | [Prompt Store B](#prompt-store-b) | The stateful counterpart of Prompt Builder B; can share a store name with Prompt Store. |
+| [Prompt Store H3 R2V](#prompt-store-h3-r2v) | A prompt store with the six section headings MiniMax Hailuo H3 R2V expects. |
 | [Prompt Store Custom](#prompt-store-custom) | A Prompt Store whose five section headings come from a wired-in headings list instead of being hardcoded. |
 | [Prompt Store Headings](#prompt-store-headings) | Five single-line entries emitting the headings list for Prompt Store Custom. |
 | [Prompt Store Get](#prompt-store-get) | Fetches one stored category from a named store, with a found flag. |
@@ -122,6 +123,22 @@ Identical behavior to [Prompt Store](#prompt-store); its `clear` only resets
 its own five keys, so it coexists with Prompt Store in the same `store_name`.
 
 **Outputs:** `prompt`, plus `quality`, `style`, `mood`, `motion`, `general`.
+
+### Prompt Store H3 R2V
+
+**A prompt store with the six section headings MiniMax Hailuo H3 R2V expects:
+subject_definitions, summary, retention_analysis, detailed_description,
+overall_soundscape, non_diegetic_music.**
+
+Same store mechanics as [Prompt Store](#prompt-store), with one difference:
+`prefix_sections` defaults to **true**, so the `prompt` output is emitted as
+`heading: content` blocks joined by blank lines — the format H3 expects. Its
+keys don't collide with Prompt Store or Prompt Store B, so all three can share
+a `store_name`.
+
+**Outputs:** `prompt`, plus `subject_definitions`, `summary`,
+`retention_analysis`, `detailed_description`, `overall_soundscape`,
+`non_diegetic_music`.
 
 ### Prompt Store Custom
 

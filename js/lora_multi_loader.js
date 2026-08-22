@@ -45,7 +45,7 @@ function setSortMode(mode) {
   try { localStorage.setItem("ccn.loramulti.sort", mode); } catch (_) {}
 }
 
-async function fetchLoraEntries() {
+export async function fetchLoraEntries() {
   try {
     const res = await api.fetchApi("/ccn/lora_filter/list");
     if (res.ok) {
@@ -262,7 +262,7 @@ function openLoraChooser(event, onPick) {
 
 const triggerCache = new Map(); // lora name -> string[] ([] = known none)
 
-async function fetchTriggers(names, { force = false } = {}) {
+export async function fetchTriggers(names, { force = false } = {}) {
   const wanted = [...new Set(
     names.filter((n) => n && n !== "None" && (force || !triggerCache.has(n))))];
   if (!wanted.length) return;
@@ -313,20 +313,20 @@ function clampStrength(v) {
   return Math.min(STRENGTH_MAX, Math.max(STRENGTH_MIN, Math.round(v * 100) / 100));
 }
 
-function isRowValue(v) {
+export function isRowValue(v) {
   return v && typeof v === "object" && typeof v.lora === "string";
 }
 
-function rowWidgets(node) {
+export function rowWidgets(node) {
   return node.widgets ? node.widgets.filter((w) => w.type === ROW_TYPE) : [];
 }
 
-function rowLoraNames(node) {
+export function rowLoraNames(node) {
   return rowWidgets(node).map((r) => r.value.lora);
 }
 
 // Re-fit height after row heights change, preserving user-set width.
-function resizeRows(node) {
+export function resizeRows(node) {
   const computed = node.computeSize();
   node.setSize([Math.max(node.size[0], computed[0]), computed[1]]);
   node.setDirtyCanvas(true, true);
@@ -551,7 +551,7 @@ function makeRow(node, value) {
   return widget;
 }
 
-function addRow(node, value) {
+export function addRow(node, value) {
   const row = makeRow(node, value);
   const buttonIndex = node.widgets.findIndex((w) => w === node._ccnAddButton);
   if (buttonIndex === -1) {
@@ -563,7 +563,7 @@ function addRow(node, value) {
   return row;
 }
 
-function ensureRowCount(node, count) {
+export function ensureRowCount(node, count) {
   let rows = rowWidgets(node);
   while (rows.length < count) {
     addRow(node);

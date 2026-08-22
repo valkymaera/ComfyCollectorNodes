@@ -51,6 +51,13 @@ def _get_partner_key(key, down_name, up_name):
 
 def _get_alpha_key(down_key, down_name):
     """Derive the alpha key from a lora_down key."""
+    # Dotted diffusers style: "{base}.lora.down.weight" -> "{base}.alpha"
+    # (NOT "{base}.lora.alpha" — that key is never read by the loader, and
+    # deriving it would leave the real "{base}.alpha" untouched in the
+    # pass-through, silently amplifying the truncated LoRA by old_rank/new.)
+    dotted = f".lora.{down_name}.weight"
+    if down_key.endswith(dotted):
+        return down_key[: -len(dotted)] + ".alpha"
     # e.g. "model.layer.lora_down.weight" -> "model.layer.alpha"
     if f".{down_name}.weight" in down_key:
         return down_key.replace(f".{down_name}.weight", ".alpha")
@@ -145,6 +152,16 @@ class LoraTruncateRank:
                 "fp8_e5m2": torch.float8_e5m2,
             }[output_dtype]
 
+        # Alpha is a single per-layer scale factor: quantizing one scalar to
+        # fp8 shifts the whole layer's effective strength coherently (and
+        # e4m3fn saturates at 448, silently clamping large alphas). Keep it
+        # in a 16/32-bit float regardless of the weight dtype — the size
+        # cost is one scalar per layer.
+        if save_dtype in (torch.float16, torch.bfloat16, torch.float32):
+            alpha_dtype = save_dtype
+        else:
+            alpha_dtype = torch.float16
+
         # --- Identify down/up pairs ---
         processed = set()
         output_sd = {}
@@ -204,7 +221,7 @@ class LoraTruncateRank:
                 else:
                     # No alpha means implicit alpha = rank, so new alpha = new_rank
                     new_alpha = float(truncated_rank)
-                output_sd[alpha_key] = torch.tensor(new_alpha).to(save_dtype)
+                output_sd[alpha_key] = torch.tensor(new_alpha, dtype=alpha_dtype)
 
             processed.add(down_key)
             processed.add(up_key)
@@ -216,11 +233,13 @@ class LoraTruncateRank:
 
         pbar.close()
 
-        # Pass through any remaining keys (bias diffs, full diffs, etc.)
+        # Pass through any remaining keys (bias diffs, full diffs, etc.).
+        # Alpha keys get alpha_dtype for the same scalar-scale reason above.
         for k, v in lora_sd.items():
             if k not in processed:
                 if isinstance(v, torch.Tensor) and v.dtype.is_floating_point:
-                    output_sd[k] = v.to(save_dtype)
+                    dt = alpha_dtype if k.endswith(".alpha") else save_dtype
+                    output_sd[k] = v.to(dt)
                 else:
                     output_sd[k] = v
 

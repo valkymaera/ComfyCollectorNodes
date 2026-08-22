@@ -24,7 +24,7 @@ from .latent_utils import LatentClamp, LatentScale, LatentNormalize, LatentStats
 from .latent_channel import LatentChannelOffset, LatentChannelOffset16, LatentChannelScale, LatentChannelScale16
 from .prompt_builder import PromptBuilder
 from .prompt_builder_b import PromptBuilderB
-from .prompt_store import PromptStore, PromptStoreB, PromptStoreClear, PromptStoreCustom, PromptStoreGet, PromptStoreHeadings, PromptStoreList
+from .prompt_store import PromptStore, PromptStoreB, PromptStoreClear, PromptStoreCustom, PromptStoreGet, PromptStoreH3R2V, PromptStoreHeadings, PromptStoreList
 from .emphasis_encode import EmphasisEncode, EmphasisEncodeAdvanced
 from .inspect_tensor import InspectTensor
 from .image_utils import ResizeByShorterEdge, ResizeToMatch, ImageBlend
@@ -41,6 +41,7 @@ from .neutral_prompt_guider import NeutralPromptEntry, NeutralPromptEmpty, Neutr
 from .compound_prompt import CompoundPrompt
 from .lora_scale_save import LoraScaleSave
 from .lora_truncate_rank import LoraTruncateRank
+from .lora_merge import LoraMergeSave
 from .lora_metadata import LoraMetadata
 from .safetensors_metadata import SafetensorsMetadata
 from .float_lerp import FloatLerp
@@ -51,7 +52,9 @@ from .curve_from_core import CurveFromCore
 from .curve_to_core import CurveToCore
 from .cfg_zero_star_scaled import CFGZeroStarScaled
 from .cropped_image import CroppedImage
+from .image_canvas import ImageCanvas
 from .image_inset import ImageInset
+from .image_stitch import ImageStitch
 from .rotate_image import RotateImage
 from .hyper_remap_krea2edit import HyperRemapKrea2Edit
 from .hyper_remap_krea2edit_slim import HyperRemapKrea2EditSlim
@@ -95,6 +98,7 @@ NODE_CLASS_MAPPINGS = {
     "CCN_PromptStoreClear": PromptStoreClear,
     "CCN_PromptStoreCustom": PromptStoreCustom,
     "CCN_PromptStoreGet": PromptStoreGet,
+    "CCN_PromptStoreH3R2V": PromptStoreH3R2V,
     "CCN_PromptStoreHeadings": PromptStoreHeadings,
     "CCN_PromptStoreList": PromptStoreList,
     "CCN_EmphasisEncode": EmphasisEncode,
@@ -122,6 +126,7 @@ NODE_CLASS_MAPPINGS = {
     "CCN_CompoundPrompt": CompoundPrompt,
     "CCN_LoraScaleSave": LoraScaleSave,
     "CCN_LoraTruncateRank": LoraTruncateRank,
+    "CCN_LoraMergeSave": LoraMergeSave,
     "CCN_LoraMetadata": LoraMetadata,
     "CCN_SafetensorsMetadata": SafetensorsMetadata,
     "CCN_DimensionScale": DimensionScale,
@@ -133,7 +138,9 @@ NODE_CLASS_MAPPINGS = {
     "CCN_CurveToCore": CurveToCore,
     "CCN_CFGZeroStarScaled": CFGZeroStarScaled,
     "CCN_CroppedImage": CroppedImage,
+    "CCN_ImageCanvas": ImageCanvas,
     "CCN_ImageInset": ImageInset,
+    "CCN_ImageStitch": ImageStitch,
     "CCN_RotateImage": RotateImage,
     "CCN_HyperRemapKrea2Edit": HyperRemapKrea2Edit,
     "CCN_HyperRemapKrea2EditSlim": HyperRemapKrea2EditSlim,
@@ -178,6 +185,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_PromptStoreClear": "Prompt Store Clear (CCN)",
     "CCN_PromptStoreCustom": "Prompt Store Custom (CCN)",
     "CCN_PromptStoreGet": "Prompt Store Get (CCN)",
+    "CCN_PromptStoreH3R2V": "Prompt Store H3 R2V (CCN)",
     "CCN_PromptStoreHeadings": "Prompt Store Headings (CCN)",
     "CCN_PromptStoreList": "Prompt Store List (CCN)",
     "CCN_EmphasisEncode": "Emphasis Encode [EXPERIMENTAL] (CCN)",
@@ -205,6 +213,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_CompoundPrompt": "Compound Prompt (CCN)",
     "CCN_LoraScaleSave": "LoRA Scale & Save (CCN)",
     "CCN_LoraTruncateRank": "LoRA Truncate Rank (CCN)",
+    "CCN_LoraMergeSave": "LoRA Merge & Save (CCN)",
     "CCN_LoraMetadata": "LoRA Metadata (CCN)",
     "CCN_SafetensorsMetadata": "Safetensors Metadata (CCN)",
     "CCN_DimensionScale": "Dimension Scale (CCN)",
@@ -216,7 +225,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_CurveToCore": "Curve To Core (CCN)",
     "CCN_CFGZeroStarScaled": "CFG-Zero* Scaled (CCN)",
     "CCN_CroppedImage": "Cropped Image (CCN)",
+    "CCN_ImageCanvas": "Image Canvas (CCN)",
     "CCN_ImageInset": "Image Inset (CCN)",
+    "CCN_ImageStitch": "Image Stitch (CCN)",
     "CCN_RotateImage": "Rotate Image (CCN)",
     "CCN_HyperRemapKrea2Edit": "Hyper Remap Krea2 Edit (CCN)",
     "CCN_HyperRemapKrea2EditSlim": "Hyper Remap Krea2 Edit Slim (CCN)",

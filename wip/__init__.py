@@ -13,6 +13,7 @@ from .moe_sigma_split import MoESigmaSplit
 from .lora_pair_loader import LoraPairLoader
 from .lora_pair_lane import LoraPairLane
 from .moe_sampler_dual import MoESamplerDual
+from .simple_track import SimpleTrack
 
 NODE_CLASS_MAPPINGS = {
     "CCN_BetterInt": BetterInt,
@@ -31,6 +32,8 @@ NODE_CLASS_MAPPINGS = {
     "CCN_LoraPairLane": LoraPairLane,
     # Key must match js/wip/moe_sampler_dual.js
     "CCN_MoESamplerDual": MoESamplerDual,
+    # Key must match js/wip/simple_track.js
+    "CCN_SimpleTrack": SimpleTrack,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -47,4 +50,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "CCN_LoraPairLoader": "LoRA Pair Loader (CCN)",
     "CCN_LoraPairLane": "LoRA Pair Lane (CCN)",
     "CCN_MoESamplerDual": "MoE Sampler Dual (CCN)",
+    "CCN_SimpleTrack": "Simple Track (CCN)",
 }

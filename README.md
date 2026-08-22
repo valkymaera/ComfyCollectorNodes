@@ -13,8 +13,8 @@ All nodes appear in the ComfyUI menu with a `(CCN)` suffix.
 
 - **[Conditioning](https://valkymaera.github.io/ComfyCollectorNodes/nodes/conditioning/)** — edit prompts in embedding space: Token/Concept/Hyper Remap for blending words toward other meanings, Projection Removal as a negative tinker node for flow models, plus scale/normalize/clamp/lerp/subtract and inspection tools.
 - **[Sampling & Guidance](https://valkymaera.github.io/ComfyCollectorNodes/nodes/sampling/)** — a visual curve editor driving CFG across sampling steps (Curve CFG Guider), CFG-Zero* Scaled, and the Neutral Prompt family for merging auxiliary prompts without fighting the main one.
-- **[LoRA](https://valkymaera.github.io/ComfyCollectorNodes/nodes/lora/)** — load by index (batch sweeps), sorted-dropdown loading, and file tools: bake in strength, truncate rank, inspect metadata/trigger words.
-- **[Image & Video](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/)** — interactive crop and inset-compositing canvases, resize/blend helpers, index-based image/video loaders, and a Video Scrubber that picks an exact frame with an in-node preview.
+- **[LoRA](https://valkymaera.github.io/ComfyCollectorNodes/nodes/lora/)** — load by index (batch sweeps), sorted-dropdown loading, and file tools: bake in strength, merge several into one, truncate rank, inspect metadata/trigger words.
+- **[Image & Video](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/)** — interactive crop, inset-compositing, and stitching canvases, resize/blend helpers, index-based image/video loaders, and a Video Scrubber that picks an exact frame with an in-node preview.
 - **[Latent](https://valkymaera.github.io/ComfyCollectorNodes/nodes/latent/)** — clamp/scale/normalize latents and adjust individual channels (4- and 16-channel variants).
 - **[Prompt & Text](https://valkymaera.github.io/ComfyCollectorNodes/nodes/prompt/)** — structured prompt builders, persistent prompt stores that accumulate across runs, and string utilities.
 - **[Utilities](https://valkymaera.github.io/ComfyCollectorNodes/nodes/utilities/)** — self-incrementing ints, rate-gated counters, named Property variables, timers, token counters, and tensor inspection.
@@ -59,6 +59,7 @@ If you load the exact frame in the video (which then gets cached), loading the p
 ## Image Inset
 The [Image Inset](https://valkymaera.github.io/ComfyCollectorNodes/nodes/image/#image-inset) node places up to three images in the canvas of a base image.
 You can rescale them and move them. By default the ratio is locked to the incoming image ratio. Each image gets its own rect.
+Each rectangle can optionally draw a colored border inside its bounds (`border_width` / `border_color`).
 
 <img width="442" height="675" alt="image" src="https://github.com/user-attachments/assets/593f119d-ee0c-44b9-b780-5643301c8aba" />
 
@@ -76,7 +77,7 @@ The prompt asks to replace the pegasus with the spaceship.
 
 # Signature Prompt nodes
 
-This comes with three base "prompt stores". Each is primarily a helper that outputs a structured prompt from text input placed in categories. 
+This comes with four base "prompt stores". Each is primarily a helper that outputs a structured prompt from text input placed in categories. 
 By default it automatically adds the category names to the prompt ahead of the text, but this can be disabled. For example, whatever you put in the 'metadata' section will be prepended by "metadata: " followed by your text.
 
 These nodes provide extra value in that they store your prompt in session memory (not a file), associated with the category and the store name.

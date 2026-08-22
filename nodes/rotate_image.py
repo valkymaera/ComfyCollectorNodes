@@ -37,7 +37,7 @@ def _to_rgb(t):
     return t[..., :3] if c > 3 else torch.cat([t] * 3, dim=-1)[..., :3]
 
 
-def _parse_hex_color(value):
+def _parse_hex_color(value, label="fill_color"):
     """Parse a 3- or 6-digit hex color ('#' optional) to float RGB 0-1."""
     s = (value or "").strip().lstrip("#")
     if len(s) == 3:
@@ -48,7 +48,7 @@ def _parse_hex_color(value):
         except ValueError:
             pass
     raise ValueError(
-        f"fill_color must be a 3- or 6-digit hex color like #1a2b3c, got: {value!r}"
+        f"{label} must be a 3- or 6-digit hex color like #1a2b3c, got: {value!r}"
     )
 
 

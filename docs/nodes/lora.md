@@ -1,7 +1,8 @@
 # LoRA
 
 Nodes for loading LoRAs — by index, filtered, or as a blended pair — and for
-working with LoRA files themselves: rescaling, shrinking, and inspecting them.
+working with LoRA files themselves: rescaling, shrinking, merging, and
+inspecting them.
 
 ## At a glance
 
@@ -13,6 +14,7 @@ working with LoRA files themselves: rescaling, shrinking, and inspecting them.
 | [LoRA List Directory](#lora-list-directory) | Lists the LoRA files in a folder plus a count — a companion to index-based loading. |
 | [LoRA Scale & Save](#lora-scale-save) | Bakes a strength change into a LoRA (via alpha or weights) and saves it as a new file. |
 | [LoRA Truncate Rank](#lora-truncate-rank) | Shrinks an SVD-extracted LoRA by slicing it to a lower rank — fast, no re-decomposition. |
+| [LoRA Merge & Save](#lora-merge-save) | Merges an expandable list of LoRAs into one LoRA file — exact, no base model, no extract step. |
 | [LoRA Metadata](#lora-metadata) | Reads a LoRA's embedded training metadata: trigger words, base model, rank, tags, and more. |
 | [Safetensors Metadata](#safetensors-metadata) | Generic safetensors inspector for any model type — metadata plus tensor structure. |
 
@@ -203,6 +205,61 @@ the truncation.
 **Outputs:** `filepath`. The filename encodes the change, e.g.
 `CCN_truncated_lora_trunc128to32_fp8_e4m3_00001.safetensors`, and the console
 reports the before/after file size.
+
+### LoRA Merge & Save
+
+**Merges an expandable list of LoRAs — each at its own strength — into a
+single LoRA file via exact weighted rank-concatenation: no base model, no
+merge-into-checkpoint + extract round trip, and lossless by default.**
+
+Click **＋ Add LoRA** to add rows (the same row widget as the LoRA Multi
+Loader): each row has an enable dot, a name that opens a searchable picker
+(multi-term filtering, A-Z / Newest sorting), and a strength you can drag or
+click to type exactly. Picked LoRAs show their top trigger words as chips.
+Disabled rows and rows with no LoRA selected are ignored; strength-`0` rows
+are skipped and noted in the report. Row order doesn't affect the result
+beyond key naming (the merged file reuses each layer's key names from the
+first row that provided that layer).
+
+Each input contributes `strength × (alpha / rank) × (up @ down)`; the merged
+file stacks the factors so its delta is *mathematically identical* to
+applying all the inputs at their strengths. The trade-off is size: the output
+rank is the **sum** of the input ranks (alphas are re-emitted as
+`alpha = rank`, with each input's scale folded into its weights). Setting
+`new_rank > 0` runs a per-layer SVD to compress the result — the only lossy
+step. At or above the concatenated rank the SVD is lossless and orders
+components by significance, making the file safe to feed into
+[LoRA Truncate Rank](#lora-truncate-rank) later.
+
+The SVD is also the only expensive step: each layer's full delta is rebuilt
+and decomposed, which can take minutes on CPU for large models — leave
+`svd_device` on `auto` so it runs on the GPU when one is available
+(`new_rank = 0` skips it entirely and is fast). Progress shows on the node
+and in the console, the run can be cancelled mid-merge, and the report
+includes timing.
+
+Kohya (`lora_up`/`lora_down`), dotted-diffusers (`lora.up`/`lora.down`), and
+PEFT (`lora_B`/`lora_A`) key formats are auto-detected and can be mixed in
+one merge (with a report warning, since strict third-party loaders may only
+apply the part they recognize). Full-rank `.diff`/`.diff_b` patches are
+merged by weighted summation, which is also exact.
+
+!!! warning "DoRA adapters cannot be merged"
+    DoRA rescales weight magnitudes per-column, which concatenation cannot
+    represent — a row containing a DoRA adapter aborts with an error
+    rather than producing a broken file.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| *lora rows* | rows | — | Added via **＋ Add LoRA**: enable dot, LoRA picker, strength (`-10`–`10`). |
+| `filename_prefix` | STRING | `loras/CCN_merged_lora` | Output path + prefix relative to the output directory. |
+| `new_rank` | INT | 0 | `0` = exact concatenation (rank = sum of input ranks). `>0` = SVD each layer to `min(new_rank, sum)`: lossy below the sum, lossless but significance-ordered at/above it. |
+| `output_dtype` | choice | `fp16` | `fp16`, `bf16`, `fp32`. Accumulation always happens in fp32. |
+| `svd_device` | choice | `auto` | Device for the per-layer SVD (`new_rank > 0` only): `auto` uses the GPU when available; falls back to CPU per-layer on out-of-memory. |
+
+**Outputs:** `filepath`, `report` (per-input merge log with any warnings —
+also shown on the node). The merge recipe (input names, strengths, rank,
+dtype) is embedded in the file's metadata under `ccn_lora_merge`.
 
 ### LoRA Metadata
 

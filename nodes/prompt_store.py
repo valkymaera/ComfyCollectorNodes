@@ -285,6 +285,115 @@ class PromptStoreB:
         )
 
 
+class PromptStoreH3R2V:
+    """
+    Stores and retrieves prompt sections with session memory (MiniMax H3 R2V headings).
+
+    Input modes:
+      - override: Replace stored value with new input
+      - merge: Combine unique delimiter-separated values (no duplicates)
+      - append: Add new input to end of existing value
+
+    Empty inputs = keep previous value (don't change)
+
+    Can share a store_name with PromptStore / PromptStoreB - keys don't collide.
+
+    Sections (the headings MiniMax H3 R2V expects in a prompt):
+      - subject_definitions: reference subject definitions
+      - summary: brief summary of the clip
+      - retention_analysis: what to retain from the references
+      - detailed_description: detailed timeline description
+      - overall_soundscape: ambient, action, and non-verbal sounds across the video
+      - non_diegetic_music: background music only the audience hears
+    """
+
+    CATEGORY = "ComfyCollectorNodes/Prompt"
+    SECTION_KEYS = ["subject_definitions", "summary", "retention_analysis", "detailed_description", "overall_soundscape", "non_diegetic_music"]
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "store_name": ("STRING", {"default": "default"}),
+                "delimiter": ("STRING", {"default": "\\n\\n"}),
+                "prefix_sections": ("BOOLEAN", {"default": True}),
+                "clear": ("BOOLEAN", {"default": False}),
+                "input_mode": (INPUT_MODES, {"default": "override"}),
+                "separator": ("STRING", {"default": ", "}),
+            },
+            "optional": {
+                "subject_definitions": ("STRING", {"default": "", "multiline": True}),
+                "summary": ("STRING", {"default": "", "multiline": True}),
+                "retention_analysis": ("STRING", {"default": "", "multiline": True}),
+                "detailed_description": ("STRING", {"default": "", "multiline": True}),
+                "overall_soundscape": ("STRING", {"default": "", "multiline": True}),
+                "non_diegetic_music": ("STRING", {"default": "", "multiline": True}),
+                "debug": ("BOOLEAN", {"default": False}),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("prompt", "subject_definitions", "summary", "retention_analysis", "detailed_description", "overall_soundscape", "non_diegetic_music")
+    FUNCTION = "process_prompt"
+
+    def process_prompt(self, store_name, delimiter, prefix_sections, clear, input_mode, separator,
+                       subject_definitions="", summary="", retention_analysis="", detailed_description="",
+                       overall_soundscape="", non_diegetic_music="", debug=False):
+        # Handle escaped characters
+        delimiter = delimiter.replace("\\n", "\n").replace("\\t", "\t")
+
+        store = _get_store(store_name)
+
+        # Clear only this node's keys if requested
+        if clear:
+            for key in self.SECTION_KEYS:
+                store[key] = ""
+            if debug:
+                print(f"[ComfyCollectorNodes] Prompt store '{store_name}' cleared (PromptStoreH3R2V keys)")
+
+        # Update sections using input mode
+        sections = {
+            "subject_definitions": subject_definitions,
+            "summary": summary,
+            "retention_analysis": retention_analysis,
+            "detailed_description": detailed_description,
+            "overall_soundscape": overall_soundscape,
+            "non_diegetic_music": non_diegetic_music,
+        }
+
+        updated = []
+        for key, value in sections.items():
+            if value and value.strip():
+                existing = store.get(key, "")
+                store[key] = _apply_input_mode(existing, value, input_mode, separator)
+                updated.append(key)
+
+        if updated and debug:
+            print(f"[ComfyCollectorNodes] Prompt store '{store_name}' updated ({input_mode}): {', '.join(updated)}")
+
+        # Build final prompt from stored values
+        parts = []
+        for key in self.SECTION_KEYS:
+            val = store.get(key, "")
+            if val:
+                if prefix_sections:
+                    parts.append(f"{key}: {val}")
+                else:
+                    parts.append(val)
+
+        result = delimiter.join(parts)
+
+        return (
+            result,
+            store.get("subject_definitions", ""),
+            store.get("summary", ""),
+            store.get("retention_analysis", ""),
+            store.get("detailed_description", ""),
+            store.get("overall_soundscape", ""),
+            store.get("non_diegetic_music", ""),
+        )
+
+
 class PromptStoreCustom:
     """
     Stores and retrieves prompt sections with session memory (custom headings).

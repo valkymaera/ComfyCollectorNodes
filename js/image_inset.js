@@ -155,6 +155,33 @@ app.registerExtension({
             return w?.value ?? true;
         }
 
+        // Composited-border settings. Drawing-only fallbacks (0 / black) on
+        // malformed values; Python validates at queue time.
+        function borderWidthPx() {
+            const w = node.widgets.find((x) => x.name === "border_width");
+            const v = Number(w?.value);
+            return Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0;
+        }
+
+        function borderFill() {
+            const w = node.widgets.find((x) => x.name === "border_color");
+            const v = String(w?.value ?? "").trim();
+            if (/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) {
+                return v.startsWith("#") ? v : "#" + v;
+            }
+            return "#000000";
+        }
+
+        // Effective border for a pw x ph source-pixel box — mirrors Python's
+        // clamp (uniform ring, inner box stays at least 1x1).
+        function effBorderSrc(pw, ph) {
+            return Math.max(0, Math.min(
+                borderWidthPx(),
+                Math.floor((pw - 1) / 2),
+                Math.floor((ph - 1) / 2),
+            ));
+        }
+
         // Pixel aspect (w/h) of an embed once its thumbnail dims are known.
         function embedAspect(id) {
             const e = embeds[id];
@@ -357,14 +384,26 @@ app.registerExtension({
             const bh = br.y - tl.y;
             const color = EMBED_COLORS[id];
 
+            // Composited border: clamp in source pixels (mirrors Python), then
+            // map to display scale so the ring thickness matches the output.
+            const effSrc = effBorderSrc((c.x2 - c.x1) * imgW, (c.y2 - c.y1) * imgH);
+            const eb = effSrc * (displayRect().w / imgW);
+            if (eb > 0) {
+                ctx.fillStyle = borderFill();
+                ctx.fillRect(tl.x, tl.y, bw, bh);
+            }
+            const ix = tl.x + eb, iy = tl.y + eb;
+            const iw = Math.max(1, bw - 2 * eb);
+            const ih = Math.max(1, bh - 2 * eb);
+
             const e = embeds[id];
             if (e.img) {
                 // WYSIWYG fill — exactly how Python pastes (stretch to box).
-                ctx.drawImage(e.img, tl.x, tl.y, bw, bh);
+                ctx.drawImage(e.img, ix, iy, iw, ih);
             } else {
                 // No thumbnail yet — translucent placeholder with a label.
                 ctx.fillStyle = color + "33";
-                ctx.fillRect(tl.x, tl.y, bw, bh);
+                ctx.fillRect(ix, iy, iw, ih);
                 ctx.fillStyle = "#ddd";
                 ctx.font = "11px sans-serif";
                 ctx.textAlign = "center";
@@ -848,6 +887,17 @@ app.registerExtension({
             };
         }
 
+        // Redraw when a visible widget that affects the preview changes.
+        for (const name of ["border_width", "border_color"]) {
+            const w = node.widgets.find((x) => x.name === name);
+            if (!w) continue;
+            const origCb = w.callback;
+            w.callback = function (...args) {
+                origCb?.apply(this, args);
+                draw();
+            };
+        }
+
         // ----------------------------------------------------------------
         //  Register DOM widget + lifecycle
         // ----------------------------------------------------------------
@@ -894,6 +944,17 @@ app.registerExtension({
         const origConfigure = node.onConfigure;
         node.onConfigure = function () {
             origConfigure?.apply(this, arguments);
+            // Pre-border saves are one widgets_values entry short: the DOM
+            // widget's trailing "" lands in border_width's slot. Coerce by
+            // value shape ("" -> 0, exactly the old no-border semantics).
+            const bwW = node.widgets.find((w) => w.name === "border_width");
+            if (bwW && typeof bwW.value !== "number") {
+                bwW.value = Math.max(0, Math.floor(Number(bwW.value)) || 0);
+            }
+            const bcW = node.widgets.find((w) => w.name === "border_color");
+            if (bcW && typeof bcW.value !== "string") {
+                bcW.value = "#000000";
+            }
             requestAnimationFrame(() => {
                 syncSize();
                 for (const id of EMBED_IDS) {
@@ -938,7 +999,17 @@ app.registerExtension({
                         const y = Math.round(c.y1 * imgH);
                         const w = Math.max(1, Math.round((c.x2 - c.x1) * imgW));
                         const h = Math.max(1, Math.round((c.y2 - c.y1) * imgH));
-                        octx.drawImage(e.img, x, y, w, h);
+                        // Full source resolution, so the border needs no
+                        // display-scale mapping — same clamp as Python.
+                        const eff = effBorderSrc(w, h);
+                        if (eff > 0) {
+                            octx.fillStyle = borderFill();
+                            octx.fillRect(x, y, w, h);
+                        }
+                        octx.drawImage(
+                            e.img, x + eff, y + eff,
+                            Math.max(1, w - 2 * eff), Math.max(1, h - 2 * eff),
+                        );
                     }
                     return off.toDataURL("image/png");
                 } catch (err) {

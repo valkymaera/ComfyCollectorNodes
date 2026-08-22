@@ -1,7 +1,7 @@
 # Image & Video
 
-Nodes for resizing, blending, cropping, rotating, and compositing images,
-computing dimensions, and loading images and video frames.
+Nodes for resizing, blending, cropping, rotating, stitching, and compositing
+images, computing dimensions, and loading images and video frames.
 
 ## At a glance
 
@@ -12,7 +12,9 @@ computing dimensions, and loading images and video frames.
 | [Image Blend](#image-blend) | Linearly blends two image batches, auto-resizing the second to match. |
 | [Cropped Image](#cropped-image) | Interactive crop tool — drag a rectangle on a canvas in the node, get the crop, mask, and geometry. |
 | [Image Inset](#image-inset) | Composites up to three images onto a base via draggable placement rectangles. |
+| [Image Stitch](#image-stitch) | Stitches up to three images side by side or stacked, scaling each to match the first, with an optional divider. |
 | [Rotate Image](#rotate-image) | Interactive rotation — drag on a canvas to rotate around a draggable pivot, with a mask of the uncovered areas. |
+| [Image Canvas](#image-canvas) | Outputs a solid-color image of a given size — a blank base the canvas tools can preview without executing. |
 | [Dimension Scale](#dimension-scale) | Computes scaled width/height numbers relative to a reference resolution — no image needed. |
 | [Image Loader By Index](#image-loader-by-index) | Loads one image from a folder by sorted index, wrapping past the end. |
 | [Video Loader By Index](#video-loader-by-index) | Loads a video from a folder by index and decodes its frames to an image batch. |
@@ -134,6 +136,14 @@ overlap. Corner handles resize, interior drags move, and with `lock_ratio` on
 distorts. Newly connected embeds drop in at staggered default positions;
 **Reset Placements** re-staggers them.
 
+An optional border (`border_width` / `border_color`) is drawn inside each
+rectangle: the border occupies the rectangle's outer N pixels and the embed
+scales to fill the inner box, so the footprint never changes and the whole
+embed stays visible. Oversized borders clamp so at least 1 px of embed
+remains; with `lock_ratio` on, a fat border on a small rectangle distorts the
+embed marginally (the inner box's aspect differs slightly from the
+rectangle's).
+
 Like [Cropped Image](#cropped-image), the base can be wired in or loaded from
 the input directory, the backdrop only changes on explicit action, and all
 placements are stored as normalized coordinates that serialize with the
@@ -146,6 +156,8 @@ workflow.
 | `embed1`–`embed3` | IMAGE | *(optional)* | Images composited into the red/green/blue rectangles. |
 | `loaded_image` | choice | `none` | Base file from the input directory when nothing is wired (supports upload). |
 | `debug` | BOOLEAN | false | Print base/embed diagnostics. |
+| `border_width` | INT | 0 | Border thickness in base-image pixels, drawn inside each rectangle; one setting shared by all embeds. 0 = none. |
+| `border_color` | STRING | `#000000` | Hex border color (`#` optional, 3- or 6-digit). |
 
 *(Twelve hidden `embedN_x1/y1/x2/y2` widgets hold the normalized rectangles.)*
 
@@ -157,6 +169,45 @@ composited. For a batched base, a single-image embed is reused across every
 frame.
 
 <!-- TODO: screenshot — Image Inset with three colored placement rectangles over a base image -->
+
+### Image Stitch
+
+**Stitches up to three images together side by side or stacked, scaling each
+to match the first, with an optional colored divider between them.**
+
+Connected inputs join in slot order 1 → 2 → 3; unconnected slots are simply
+skipped. The first connected image sets the shared edge — heights match for
+`horizontal`, widths for `vertical` — and the others are scaled to it with
+aspect ratio preserved. The divider (`border_width` / `border_color`) is
+drawn between adjacent images only, never as an outer frame; with a single
+image connected the node is a passthrough.
+
+The canvas shows a live composed preview: **Load Preview** pulls each wired
+upstream's preview (or the thumbnail the node saved on its last run) and
+stitches them client-side, so direction and divider changes are visible
+without executing the graph. A wired slot with no preview available yet is
+skipped in the composition and named in the status line. Upstream previews
+may be downscaled thumbnails, so the status line's absolute pixel counts can
+undershoot the real output — the composed geometry stays aspect-correct
+regardless.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `direction` | choice | `horizontal` | `horizontal` joins left-to-right; `vertical` stacks top-to-bottom. |
+| `image1`–`image3` | IMAGE | *(optional)* | Images to stitch, in slot order. At least one must be wired. |
+| `border_width` | INT | 0 | Divider thickness in pixels between adjacent images (`0`–`1024`). 0 = none. |
+| `border_color` | STRING | `#000000` | Hex divider color (`#` optional, 3- or 6-digit). |
+| `debug` | BOOLEAN | false | Print size/border/output diagnostics. |
+
+*(No hidden widgets — the canvas is display-only.)*
+
+**Outputs:** `image` (the stitched result).
+
+Images are treated as opaque — an RGBA input's alpha channel is dropped. The
+output batch matches the largest connected batch; shorter batches repeat
+their last frame.
+
+<!-- TODO: screenshot — Image Stitch canvas showing three images side by side with a divider -->
 
 ### Rotate Image
 
@@ -195,6 +246,24 @@ canvas manages them.)*
 (the unrotated input, passthrough).
 
 <!-- TODO: screenshot — Rotate Image canvas mid-drag with the pivot crosshair visible -->
+
+### Image Canvas
+
+**Outputs a solid-color image of the given width, height, and hex color — a
+blank canvas base for the interactive image tools.**
+
+The node has no canvas of its own, but it participates in the CCN preview
+convention: when wired into Cropped Image, Image Inset, Image Stitch, or
+Rotate Image, their **Load Preview** button renders the flat color
+client-side from the current widget values — no execution needed, and the
+preview always matches what the next run will output.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `width`, `height` | INT | 1024 | Output dimensions in pixels (`1`–`8192`). |
+| `color` | STRING | `#000000` | Hex fill color (`#` optional, 3- or 6-digit). |
+
+**Outputs:** `image` (a single solid-color frame).
 
 ### Dimension Scale
 
